@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Verhältnisaufgaben – Teile oben, Wert darunter</title>
+<title>Verhältnisaufgaben – Teile oben, Wert darunter (nebeneinander)</title>
 <style>
   *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
   body{margin:0;background:#f4f4f4;display:flex;justify-content:center}
@@ -30,12 +30,22 @@
   }
   .vizTitle{font-weight:1000;font-size:13px;margin-bottom:10px;color:#222}
 
+  .rowCompare{
+    display:flex;
+    align-items:flex-end;        /* unten bündig */
+    gap:16px;
+    flex-wrap:nowrap;
+  }
+  @media (max-width:700px){
+    .rowCompare{flex-wrap:wrap;}
+  }
+
   .block{
     border-radius:14px;
     border:2px solid rgba(0,0,0,.25);
     background: var(--bg);
     padding:12px;
-    min-height:100px;
+    min-height:104px;
     display:flex;
     flex-direction:column;
     justify-content:space-between;
@@ -60,9 +70,10 @@
   .valueRow{
     margin-top:10px;
     font-weight:1000;
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap;
   }
   .pill{
-    background: rgba(255,255,255,.75);
+    background: rgba(255,255,255,.78);
     border:1px solid rgba(0,0,0,.2);
     border-radius:999px;
     padding:4px 10px;
@@ -76,7 +87,11 @@
     border:1px solid #e5e5e5;border-radius:12px;padding:12px;background:#fff;
   }
   .calcTitle{font-weight:1000;margin-bottom:8px}
-  .line{margin:6px 0;font-weight:1000;}
+  .line{
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+    margin:6px 0;
+    font-weight:1000;
+  }
   .eq{
     display:inline-block;
     font-weight:1000;
@@ -96,7 +111,7 @@
   .inputRow{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   input[type="text"]{
     padding:10px;border-radius:12px;border:1px solid #ccc;background:#fff;
-    font-size:14px;min-width:140px;
+    font-size:14px;min-width:160px;
   }
   .btn{
     padding:10px 12px;border:none;border-radius:12px;
@@ -106,6 +121,8 @@
   .btn.secondary{background:#222}
   .btn.secondary:hover{background:#000}
   .btn:disabled{opacity:.5;cursor:not-allowed}
+  .switch{display:inline-flex;align-items:center;gap:8px;font-weight:900;user-select:none}
+  .hint{font-size:12px;color:#555;font-weight:800;margin-top:6px}
   .feedback{margin-top:10px;font-weight:1000;min-height:22px}
   .controls{margin-top:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
 
@@ -136,11 +153,13 @@
 
     <div class="inputRow">
       <label for="ans" style="font-weight:1000;">Dein Ergebnis:</label>
-      <input id="ans" type="text" inputmode="decimal" />
+      <input id="ans" type="text" inputmode="decimal" placeholder="z.B. 1,5" />
       <span id="unitTag" style="font-weight:1000;"></span>
       <button class="btn" id="checkBtn">Prüfen</button>
+      <label class="switch"><input type="checkbox" id="animToggle" checked /> Animation</label>
     </div>
 
+    <div class="hint" id="hint"></div>
     <div class="feedback" id="feedback"></div>
 
     <div class="controls">
@@ -151,114 +170,334 @@
 </div>
 
 <script>
-function gcd(a,b){while(b){[a,b]=[b,a%b]}return a}
-function simplifyRatio(a,b){const g=gcd(a,b);return[a/g,b/g]}
-function fmt(x){return (Math.round(x*1000)/1000).toString().replace(".",",")}
-function parseDE(s){return Number(s.replace(",", "."))}
-function compute(t){
-  const [aa,bb]=simplifyRatio(t.rA,t.rB)
-  const knownParts=t.knownSide==="A"?aa:bb
-  const askParts=t.askSide==="A"?aa:bb
-  const one=t.knownValue/knownParts
-  return{aa,bb,one,result:one*askParts}
+/* ===== Helpers ===== */
+function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){const t=a%b;a=b;b=t;}return a||1;}
+function simplifyRatio(a,b){const g=gcd(a,b);return [a/g,b/g];}
+function fmt(x){
+  const r = Math.round((x + Number.EPSILON) * 1000) / 1000;
+  const s = Number.isInteger(r) ? String(r) : String(r);
+  return s.replace(".", ",");
+}
+function parseDE(s){
+  if(typeof s!=="string") return NaN;
+  const t=s.trim().replace(/\s+/g,"").replace(",",".");
+  if(t==="") return NaN;
+  const v=Number(t);
+  return Number.isFinite(v)?v:NaN;
+}
+function nearlyEqual(a,b){return Math.abs(a-b) <= 1e-6;}
+
+/* ===== Compute ===== */
+function compute(task){
+  const [aa, bb] = simplifyRatio(task.rA, task.rB);
+  const knownParts = (task.knownSide==="A") ? aa : bb;
+  const askParts   = (task.askSide==="A") ? aa : bb;
+  const onePart = task.knownValue / knownParts;
+  const result = onePart * askParts;
+  return {aa, bb, knownParts, askParts, onePart, result};
 }
 
-function renderViz(t){
-  const c=compute(t)
-  const max=Math.max(c.aa,c.bb)
-  const widthA=(c.aa/max)*100
-  const widthB=(c.bb/max)*100
+/* ===== Colors ===== */
+function applyColors(task){
+  document.documentElement.style.setProperty("--A", task.colorA);
+  document.documentElement.style.setProperty("--B", task.colorB);
+}
 
-  const showA=t.askSide==="A"?"?"+t.unit:(t.knownSide==="A"?fmt(t.knownValue)+t.unit:"?"+t.unit)
-  const showB=t.askSide==="B"?"?"+t.unit:(t.knownSide==="B"?fmt(t.knownValue)+t.unit:"?"+t.unit)
+/* ===== Visual (nebeneinander + Breite nach Teilen) ===== */
+function renderViz(task){
+  const c = compute(task);
 
-  document.getElementById("viz").innerHTML=`
-    <div class="vizTitle">Mehr Teile → breiterer Block</div>
+  // Breiten relativ zum größeren Anteil
+  const maxParts = Math.max(c.aa, c.bb);
+  const widthA = (c.aa / maxParts) * 100;
+  const widthB = (c.bb / maxParts) * 100;
 
-    <div style="display:flex;align-items:flex-end;gap:20px;">
-      <div class="block" style="--bg:var(--A);width:${widthA}%;">
+  const showA = (task.askSide==="A")
+    ? `?${task.unit}`
+    : (task.knownSide==="A" ? `${fmt(task.knownValue)}${task.unit}` : `?${task.unit}`);
+
+  const showB = (task.askSide==="B")
+    ? `?${task.unit}`
+    : (task.knownSide==="B" ? `${fmt(task.knownValue)}${task.unit}` : `?${task.unit}`);
+
+  const viz = document.getElementById("viz");
+  viz.innerHTML = `
+    <div class="vizTitle">Mehr Teile → breiterer Block. (Teile oben, Wert darunter)</div>
+
+    <div class="rowCompare">
+      <div class="block" id="blockA"
+           style="--bg: var(--A); width:${widthA}%; min-width:180px;">
         <div class="blockTop">
-          <div>${t.nameA}</div>
-          <div>${c.aa} <small>Teile</small></div>
+          <div class="name">${task.nameA}</div>
+          <div class="parts">${c.aa} <small>Teile</small></div>
         </div>
-        <div class="valueRow"><span class="pill">${showA}</span></div>
+        <div class="valueRow">
+          <span class="pill" id="valA">${showA}</span>
+        </div>
       </div>
 
-      <div class="block" style="--bg:var(--B);width:${widthB}%;">
+      <div class="block" id="blockB"
+           style="--bg: var(--B); width:${widthB}%; min-width:180px;">
         <div class="blockTop">
-          <div>${t.nameB}</div>
-          <div>${c.bb} <small>Teile</small></div>
+          <div class="name">${task.nameB}</div>
+          <div class="parts">${c.bb} <small>Teile</small></div>
         </div>
-        <div class="valueRow"><span class="pill">${showB}</span></div>
+        <div class="valueRow">
+          <span class="pill" id="valB">${showB}</span>
+        </div>
       </div>
     </div>
-  `
-}
 
-function renderCalc(t){
-  const c=compute(t)
-  document.getElementById("calc").innerHTML=`
-    <div class="hidden" id="solution">
-      <div>1 Teil: <span class="eq">${fmt(t.knownValue)} : ${t.knownSide==="A"?c.aa:c.bb} = ${fmt(c.one)}${t.unit}</span></div>
-      <div style="margin-top:6px;">
-        Ergebnis: <span class="eq">${fmt(c.result)}${t.unit}</span>
-      </div>
+    <div class="sep"></div>
+
+    <div class="hint">
+      Merksatz: Erst <b>1 Teil</b> ausrechnen (teilen). Dann die gesuchte Seite (mal).
     </div>
-  `
+  `;
 }
 
-const tasks=[
-  {cat:"Erbschaft",title:"c)",text:"Hanni : Nanni = 3 : 2. Hanni bekommt 3000 €.",
-   nameA:"Hanni",nameB:"Nanni",rA:3,rB:2,knownSide:"A",knownValue:3000,askSide:"B",unit:" €",
-   colorA:"rgba(255,140,140,.85)",colorB:"rgba(140,190,255,.85)"}
-]
+/* ===== Calculation panel ===== */
+function renderCalc(task){
+  const c = compute(task);
+  const calc = document.getElementById("calc");
 
-let idx=0,graded=0,correct=0
-const scoreEl=document.getElementById("score")
-const metaEl=document.getElementById("meta")
+  const knownName = (task.knownSide==="A") ? task.nameA : task.nameB;
+  const askName   = (task.askSide==="A") ? task.nameA : task.nameB;
+
+  calc.innerHTML = `
+    <div class="calcTitle">Rechnung (erscheint nach dem Prüfen)</div>
+
+    <div class="line hidden" id="line1">
+      <div>1 Teil:</div>
+      <div class="eq">
+        <span class="hl">${fmt(task.knownValue)}</span> : <span class="hl">${c.knownParts}</span>
+        = <span class="hl">${fmt(c.onePart)}</span>${task.unit}
+      </div>
+      <div class="hint">${knownName} hat ${c.knownParts} Teile.</div>
+    </div>
+
+    <div class="line hidden" id="line2">
+      <div>${askName}:</div>
+      <div class="eq">
+        <span class="hl">${fmt(c.onePart)}</span>${task.unit}
+        · <span class="hl">${c.askParts}</span>
+        = <span class="hl">${fmt(c.result)}</span>${task.unit}
+      </div>
+      <div class="hint">${askName} hat ${c.askParts} Teile.</div>
+    </div>
+
+    <div class="hint hidden" id="ratioLine">
+      Verhältnis: <b>${task.nameA} : ${task.nameB} = ${c.aa} : ${c.bb}</b>
+    </div>
+  `;
+}
+
+function showCalc(animated){
+  document.getElementById("line1").classList.remove("hidden");
+  document.getElementById("ratioLine").classList.remove("hidden");
+  if(!animated){
+    document.getElementById("line2").classList.remove("hidden");
+    return;
+  }
+  setTimeout(()=>document.getElementById("line2").classList.remove("hidden"), 800);
+}
+
+/* ===== Mini animation ===== */
+let timers=[];
+function stopAnim(){ timers.forEach(t=>clearTimeout(t)); timers=[]; clearHL(); }
+function clearHL(){
+  ["blockA","blockB"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.classList.remove("hl","dim"); }
+  });
+}
+function focusKnown(task){
+  const knownId = (task.knownSide==="A") ? "blockA" : "blockB";
+  const otherId = (task.knownSide==="A") ? "blockB" : "blockA";
+  document.getElementById(knownId)?.classList.add("hl");
+  document.getElementById(otherId)?.classList.add("dim");
+}
+function focusAsk(task){
+  const askId = (task.askSide==="A") ? "blockA" : "blockB";
+  const otherId = (task.askSide==="A") ? "blockB" : "blockA";
+  document.getElementById(askId)?.classList.add("hl");
+  document.getElementById(otherId)?.classList.add("dim");
+}
+function replaceUnknown(task){
+  const c=compute(task);
+  const target = (task.askSide==="A") ? "valA" : "valB";
+  const el=document.getElementById(target);
+  if(el) el.textContent = `${fmt(c.result)}${task.unit}`;
+}
+function animateSolve(task){
+  stopAnim();
+  focusKnown(task);
+
+  timers.push(setTimeout(()=>{
+    showCalc(true);
+  }, 350));
+
+  timers.push(setTimeout(()=>{
+    clearHL();
+    focusAsk(task);
+    replaceUnknown(task);
+  }, 1500));
+}
+
+/* ===== Tasks ===== */
+const COLORS = {
+  white: "rgba(235,235,235,.95)",
+  yellow:"rgba(255,230,120,.92)",
+  lightblue:"rgba(160,210,255,.92)",
+  red:"rgba(255,140,140,.85)",
+  blue:"rgba(140,190,255,.85)"
+};
+
+function makeTask({cat,title,context,nameA,nameB,rA,rB,knownSide,knownValue,askSide,unit,colorA,colorB,question}){
+  return {cat,title,context,nameA,nameB,rA,rB,knownSide,knownValue,askSide,unit:unit||"",colorA,colorB,question};
+}
+
+const tasks = [
+  makeTask({
+    cat:"Farbe mischen",
+    title:"Aufgabe a)",
+    context:"Markus mischt weiße und gelbe Farbe im Verhältnis 5 : 2. Er hat 2 Liter gelbe Farbe.",
+    nameA:"Weiße Farbe", nameB:"Gelbe Farbe",
+    rA:5, rB:2, knownSide:"B", knownValue:2, askSide:"A",
+    unit:" L", colorA: COLORS.white, colorB: COLORS.yellow,
+    question:"Wie viel weiße Farbe braucht er?"
+  }),
+  makeTask({
+    cat:"Farbe mischen",
+    title:"Aufgabe b)",
+    context:"Sandra mischt hellblaue und weiße Farbe im Verhältnis 3 : 1. Sie hat 0,5 Liter weiße Farbe.",
+    nameA:"Hellblaue Farbe", nameB:"Weiße Farbe",
+    rA:3, rB:1, knownSide:"B", knownValue:0.5, askSide:"A",
+    unit:" L", colorA: COLORS.lightblue, colorB: COLORS.white,
+    question:"Wie viel hellblaue Farbe braucht sie?"
+  }),
+  makeTask({
+    cat:"Erbschaft",
+    title:"Aufgabe c)",
+    context:"Eine Erbschaft wird zwischen Hanni und Nanni im Verhältnis 3 : 2 aufgeteilt. Hanni bekommt 3000 €.",
+    nameA:"Hanni", nameB:"Nanni",
+    rA:3, rB:2, knownSide:"A", knownValue:3000, askSide:"B",
+    unit:" €", colorA: COLORS.red, colorB: COLORS.blue,
+    question:"Wie viel erbt Nanni?"
+  }),
+  makeTask({
+    cat:"Erbschaft",
+    title:"Aufgabe d)",
+    context:"Eine Erbschaft wird zwischen Max und Moritz im Verhältnis 9 : 8 aufgeteilt. Moritz erhält 720 €.",
+    nameA:"Max", nameB:"Moritz",
+    rA:9, rB:8, knownSide:"B", knownValue:720, askSide:"A",
+    unit:" €", colorA: COLORS.red, colorB: COLORS.blue,
+    question:"Wie viel erbt Max?"
+  })
+];
+
+/* ===== UI State ===== */
+let idx=0, graded=0, correct=0, answered=false;
+
+const scoreEl=document.getElementById("score");
+const metaEl=document.getElementById("meta");
+const catEl=document.getElementById("cat");
+const titleEl=document.getElementById("title");
+const textEl=document.getElementById("text");
+const promptEl=document.getElementById("prompt");
+const ansEl=document.getElementById("ans");
+const unitTag=document.getElementById("unitTag");
+const feedbackEl=document.getElementById("feedback");
+const hintEl=document.getElementById("hint");
+const checkBtn=document.getElementById("checkBtn");
+const nextBtn=document.getElementById("nextBtn");
+const restartBtn=document.getElementById("restartBtn");
+const animToggle=document.getElementById("animToggle");
+
+function updateTop(){
+  scoreEl.textContent=`Richtig: ${correct} / ${graded}`;
+  metaEl.textContent=`${idx+1} / ${tasks.length}`;
+}
 
 function render(){
-  const t=tasks[idx]
-  document.documentElement.style.setProperty("--A",t.colorA)
-  document.documentElement.style.setProperty("--B",t.colorB)
+  stopAnim();
+  answered=false;
+  nextBtn.disabled=true;
+  feedbackEl.textContent="";
+  ansEl.value="";
 
-  document.getElementById("cat").textContent=t.cat
-  document.getElementById("title").textContent=t.title
-  document.getElementById("text").textContent=t.text
-  document.getElementById("prompt").textContent="Wie viel bekommt "+(t.askSide==="A"?t.nameA:t.nameB)+"?"
-  document.getElementById("unitTag").textContent=t.unit
-  renderViz(t)
-  renderCalc(t)
-  scoreEl.textContent="Richtig: "+correct+" / "+graded
-  metaEl.textContent=(idx+1)+" / "+tasks.length
+  const t=tasks[idx];
+  applyColors(t);
+  updateTop();
+
+  catEl.textContent=t.cat;
+  titleEl.textContent=t.title;
+  textEl.textContent=t.context;
+
+  promptEl.textContent=t.question;
+  unitTag.textContent=t.unit;
+
+  hintEl.textContent="Merksatz: Erst 1 Teil ausrechnen (teilen). Dann die gesuchte Seite (mal).";
+
+  renderViz(t);
+  renderCalc(t);
+
+  setTimeout(()=>ansEl.focus(), 50);
 }
 
-document.getElementById("checkBtn").onclick=function(){
-  const t=tasks[idx]
-  const c=compute(t)
-  const val=parseDE(document.getElementById("ans").value)
-  graded++
-  if(Math.abs(val-c.result)<0.001) correct++
-  document.getElementById("solution").classList.remove("hidden")
-  scoreEl.textContent="Richtig: "+correct+" / "+graded
-  document.getElementById("nextBtn").disabled=false
+function check(){
+  if(answered) return;
+
+  const t=tasks[idx];
+  const c=compute(t);
+  const user=parseDE(ansEl.value);
+
+  if(!Number.isFinite(user)){
+    feedbackEl.textContent="Bitte eine Zahl eingeben (z.B. 1,5).";
+    return;
+  }
+
+  answered=true;
+  graded++;
+
+  const ok = nearlyEqual(user, c.result);
+  if(ok) correct++;
+
+  updateTop();
+
+  if(animToggle.checked){
+    animateSolve(t);
+  }else{
+    showCalc(false);
+    clearHL();
+    focusAsk(t);
+    replaceUnknown(t);
+  }
+
+  const askName=(t.askSide==="A")?t.nameA:t.nameB;
+  const right = `${fmt(c.result)}${t.unit}`;
+
+  feedbackEl.textContent = ok
+    ? `Richtig. ${askName}: ${right}`
+    : `Falsch. Richtig wäre: ${askName}: ${right}`;
+
+  nextBtn.disabled=false;
 }
 
-document.getElementById("nextBtn").onclick=function(){
-  idx=(idx+1)%tasks.length
-  document.getElementById("ans").value=""
-  document.getElementById("nextBtn").disabled=true
-  render()
-}
+checkBtn.addEventListener("click", check);
+ansEl.addEventListener("keydown", (e)=>{ if(e.key==="Enter") check(); });
 
-document.getElementById("restartBtn").onclick=function(){
-  idx=0;graded=0;correct=0
-  document.getElementById("ans").value=""
-  document.getElementById("nextBtn").disabled=true
-  render()
-}
+nextBtn.addEventListener("click", ()=>{
+  idx=(idx+1) % tasks.length;
+  render();
+});
 
-render()
+restartBtn.addEventListener("click", ()=>{
+  idx=0; graded=0; correct=0;
+  render();
+});
+
+render();
 </script>
 </body>
 </html>
