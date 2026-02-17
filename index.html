@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Verhältnisaufgaben – Zwei Balken (Teile + Menge) mit Animation</title>
+<title>Verhältnisaufgaben – Zwei Balken ohne Klammern, Mengenbalken skaliert</title>
 <style>
   *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
   body{margin:0;background:#f4f4f4;display:flex;justify-content:center}
@@ -22,6 +22,7 @@
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-top:12px}
   .col{flex:1 1 560px}
   .stepsPanel{flex:1 1 520px;border:1px solid #e5e5e5;border-radius:12px;background:#fff;padding:12px}
+
   .stepsTitle{font-weight:1000;font-size:14px;margin-bottom:10px}
   .stepsGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:stretch}
   .stepBox{border:1px solid #eee;background:#fafafa;border-radius:12px;padding:10px;min-height:112px}
@@ -77,7 +78,7 @@
     height:100%;border-right:1px solid rgba(0,0,0,.25);
     display:flex;align-items:center;justify-content:center;
     font-weight:1000;font-size:18px;color:#111;user-select:none;
-    position:relative;transition:outline .18s ease, transform .18s ease, filter .18s ease;
+    position:relative;transition:outline .18s ease, transform .18s ease, filter .18s ease, opacity .18s ease;
   }
   .part:last-child{border-right:none}
   .partA{background:var(--A)}
@@ -88,7 +89,7 @@
     border:1px solid rgba(0,0,0,.25);
     min-width:40px;text-align:center;font-size:16px
   }
-  .part.dim .num{opacity:.45}
+  .part.dim{opacity:.55}
   .part.highlight{
     outline:5px solid var(--glow);outline-offset:-5px;
     transform:translateY(-1px) scale(1.01);filter:brightness(1.03);z-index:1;
@@ -106,32 +107,14 @@
   .dot{width:10px;height:10px;border-radius:999px;display:inline-block;border:1px solid rgba(0,0,0,.25)}
   .dotA{background:var(--A)} .dotB{background:var(--B)}
 
-  /* Klammern über Teilgruppen (bekannt/gesucht) */
-  .bracket{
-    position:absolute;top:-28px;height:24px;
-    border-top:3px solid #111;
-    border-left:3px solid #111;
-    border-right:3px solid #111;
-    border-radius:10px 10px 0 0;
-    display:flex;align-items:flex-start;justify-content:center;
-    padding-top:2px;
-    pointer-events:none;
-    opacity:0;
-    transform:translateY(4px);
-    transition:opacity .25s ease, transform .25s ease, filter .25s ease;
-  }
-  .bracket.show{opacity:1;transform:translateY(0)}
-  .bracket.glow{filter:drop-shadow(0 0 6px rgba(255,215,0,.85))}
-  .brLabel{
-    font-weight:1000;font-size:12px;background:rgba(255,255,255,.9);
-    border:1px solid rgba(0,0,0,.2);padding:2px 8px;border-radius:999px;
-  }
-
   .subTitle{font-weight:1000;font-size:12px;color:#333;margin:10px 0 6px}
   .tiny{font-size:12px;color:#666;font-weight:800}
-  .switch{
-    display:inline-flex;align-items:center;gap:8px;font-weight:900;
-    user-select:none
+  .switch{display:inline-flex;align-items:center;gap:8px;font-weight:900;user-select:none}
+
+  /* Mengenbalken-Skalierung */
+  .qtyScale{
+    transform-origin:left center;
+    transition: transform .35s ease;
   }
 
   @media (max-width:980px){
@@ -143,7 +126,7 @@
 </head>
 <body>
 <div class="app">
-  <h1>Verhältnisaufgaben – zwei Balken (Teile + Menge)</h1>
+  <h1>Verhältnisaufgaben – zwei Balken (ohne Klammern), Mengenbalken skaliert</h1>
 
   <div class="top">
     <div class="score" id="score">Richtig: 0 / 0</div>
@@ -204,24 +187,17 @@ let timers=[];
 function stopAnimation(){
   timers.forEach(t=>clearTimeout(t));
   timers=[];
-  clearPartMarks();
-  clearBracketGlow();
+  clearMarks();
 }
-function clearPartMarks(){
-  const bars=[document.getElementById("ratioBar"), document.getElementById("qtyBar")];
-  bars.forEach(bar=>{
+function clearMarks(){
+  ["ratioBar","qtyBar"].forEach(id=>{
+    const bar=document.getElementById(id);
     if(!bar) return;
     [...bar.querySelectorAll(".part")].forEach(p=>p.classList.remove("highlight","groupHighlight","dim"));
   });
 }
-function clearBracketGlow(){
-  ["brKnown","brAsk"].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.classList.remove("glow");
-  });
-}
 
-/* ========= Core compute (bekannte Seite -> pro Teil -> gesuchte Seite) ========= */
+/* ========= Compute ========= */
 function compute(task){
   const [aa, bb] = simplifyRatio(task.rA, task.rB);
   const knownParts = (task.knownSide==="A") ? aa : bb;
@@ -231,10 +207,23 @@ function compute(task){
   return {aa,bb,sum:aa+bb,knownParts,askParts,onePart,result};
 }
 
-/* ========= Visual: TWO bars =========
-   1) ratioBar: zeigt nur Teile (A/B)
-   2) qtyBar: gleiche Teile, aber Zahlen/klammern für bekannt & gesucht
+/* ========= Scale logic for qty bar =========
+   - Baseline: 1 Teil = 1 Einheit -> scale = 1
+   - Log-Skalierung, damit 1000 nicht alles sprengt
+   - Clamp, damit es im Layout bleibt
 */
+function clamp(x,lo,hi){return Math.max(lo, Math.min(hi,x));}
+function qtyScaleFromOnePart(onePart){
+  // onePart <= 0 -> fallback
+  const v = Math.max(1e-9, onePart);
+  // log10(1)=0, log10(10)=1, log10(0.1)=-1
+  const k = Math.log10(v);
+  // 0.18 ist "wie stark" es wirken soll; feinjustierbar
+  const scale = 1 + 0.18 * k;
+  return clamp(scale, 0.65, 1.55);
+}
+
+/* ========= Visual: TWO bars (no brackets) ========= */
 function renderTwoBars(vizEl, task){
   const c=compute(task);
   const sum=c.sum;
@@ -244,12 +233,11 @@ function renderTwoBars(vizEl, task){
     parts.push({cls: i < c.aa ? "partA" : "partB"});
   }
 
-  // Labels
-  const askName = (task.askSide==="A") ? task.nameA : task.nameB;
   const knownName = (task.knownSide==="A") ? task.nameA : task.nameB;
+  const askName   = (task.askSide==="A") ? task.nameA : task.nameB;
 
   vizEl.innerHTML = `
-    <div class="vizTitle">Zwei Balken: oben „Teile“, unten „Menge“</div>
+    <div class="vizTitle">Zwei Balken: oben „Teile“, unten „Menge“ (Länge abhängig von 1 Teil)</div>
 
     <div class="vizBlock">
       <div class="subTitle">1) Teile-Balken (nur Verhältnis <b>${c.aa}:${c.bb}</b>)</div>
@@ -257,7 +245,7 @@ function renderTwoBars(vizEl, task){
         <div class="bar" id="ratioBar">
           ${parts.map((p,idx)=>`
             <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
-              <div class="num">${idx < c.aa ? "1" : "1"}</div>
+              <div class="num">1</div>
             </div>
           `).join("")}
         </div>
@@ -271,10 +259,12 @@ function renderTwoBars(vizEl, task){
 
     <div class="vizBlock">
       <div class="subTitle">2) Mengen-Balken (bekannt → „pro Teil“ → gesucht)</div>
-      <div class="barWrap" id="qtyWrap">
-        <div class="bracket" id="brKnown"><div class="brLabel" id="brKnownLabel"></div></div>
-        <div class="bracket" id="brAsk"><div class="brLabel" id="brAskLabel"></div></div>
+      <div class="tiny" style="margin:0 0 6px 0;">
+        Bekannt: <b>${knownName} = ${fmt(task.knownValue)}${task.unit}</b> &nbsp;|&nbsp;
+        Gesucht: <b>${askName}</b>
+      </div>
 
+      <div class="barWrap qtyScale" id="qtyScaleWrap">
         <div class="bar" id="qtyBar">
           ${parts.map((p,idx)=>`
             <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
@@ -284,72 +274,21 @@ function renderTwoBars(vizEl, task){
         </div>
       </div>
 
-      <div class="tiny" style="margin-top:8px;">
-        Bekannt: <b>${knownName}</b> &nbsp;|&nbsp; Gesucht: <b>${askName}</b>
-      </div>
+      <div class="tiny" id="scaleInfo" style="margin-top:8px;"></div>
     </div>
   `;
 
-  // Init qty numbers empty + brackets positioned
+  // scale qty bar based on onePart
+  const scale = qtyScaleFromOnePart(c.onePart);
+  const wrap = document.getElementById("qtyScaleWrap");
+  wrap.style.transform = `scaleX(${scale})`;
+
+  const info = document.getElementById("scaleInfo");
+  info.textContent = `Maßstab-Idee: 1 Teil = ${fmt(c.onePart)}${task.unit} → Mengenbalken ist ${Math.round(scale*100)}% so lang.`;
+
   setAllQtyNumbers("");
-  placeBrackets(task);
-
-  // Show brackets (known shows value, ask shows x/?)
-  const brKnownLabel=document.getElementById("brKnownLabel");
-  const brAskLabel=document.getElementById("brAskLabel");
-  brKnownLabel.textContent = `${fmt(task.knownValue)}${task.unit}`;
-  brAskLabel.textContent = `x${task.unit}`;
-
-  document.getElementById("brKnown").classList.add("show");
-  document.getElementById("brAsk").classList.add("show");
 }
 
-/* Place bracket elements over correct ranges in qtyBar */
-function placeBrackets(task){
-  const c=compute(task);
-  const wrap=document.getElementById("qtyWrap");
-  const bar=document.getElementById("qtyBar");
-  if(!wrap || !bar) return;
-
-  const parts=[...bar.querySelectorAll(".part")];
-  if(parts.length===0) return;
-
-  function rangeRect(fromIdx,toIdxInclusive){
-    const a=parts[fromIdx].getBoundingClientRect();
-    const b=parts[toIdxInclusive].getBoundingClientRect();
-    const w=wrap.getBoundingClientRect();
-    return {
-      left: a.left - w.left,
-      right: b.right - w.left
-    };
-  }
-
-  const knownIsA = task.knownSide==="A";
-  const askIsA = task.askSide==="A";
-
-  const knownFrom = knownIsA ? 0 : c.aa;
-  const knownTo   = knownIsA ? (c.aa-1) : (c.aa + c.bb - 1);
-
-  const askFrom   = askIsA ? 0 : c.aa;
-  const askTo     = askIsA ? (c.aa-1) : (c.aa + c.bb - 1);
-
-  const rK=rangeRect(knownFrom, knownTo);
-  const rA=rangeRect(askFrom, askTo);
-
-  const brKnown=document.getElementById("brKnown");
-  const brAsk=document.getElementById("brAsk");
-
-  const pad=2; // small inset
-  brKnown.style.left = (rK.left + pad) + "px";
-  brKnown.style.width = Math.max(8, (rK.right - rK.left - 2*pad)) + "px";
-
-  brAsk.style.left = (rA.left + pad) + "px";
-  brAsk.style.width = Math.max(8, (rA.right - rA.left - 2*pad)) + "px";
-}
-
-window.addEventListener("resize", ()=>{ const t=tasks[idx]; if(t) placeBrackets(t); });
-
-/* Qty bar numbers helpers */
 function setAllQtyNumbers(val){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
@@ -358,26 +297,26 @@ function setAllQtyNumbers(val){
 function setQtyNumber(i,val){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
-  const box=bar.querySelector(`.part[data-idx="${i}"] .num`);
+  const box=bar.querySelector(\`.part[data-idx="\${i}"] .num\`);
   if(box) box.textContent=val;
 }
-function markQtyPart(i, cls){
+function highlightQtyPart(i){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
-  const p=bar.querySelector(`.part[data-idx="${i}"]`);
-  if(p) p.classList.add(cls);
+  const p=bar.querySelector(\`.part[data-idx="\${i}"]\`);
+  if(p) p.classList.add("highlight");
 }
-function unmarkQtyPart(i, cls){
+function unhighlightQtyPart(i){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
-  const p=bar.querySelector(`.part[data-idx="${i}"]`);
-  if(p) p.classList.remove(cls);
+  const p=bar.querySelector(\`.part[data-idx="\${i}"]\`);
+  if(p) p.classList.remove("highlight");
 }
 function highlightQtyGroup(indices){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
   indices.forEach(i=>{
-    const p=bar.querySelector(`.part[data-idx="${i}"]`);
+    const p=bar.querySelector(\`.part[data-idx="\${i}"]\`);
     if(p) p.classList.add("groupHighlight");
   });
 }
@@ -449,27 +388,27 @@ function animateAfterCheck(task){
 
   timers.push(setTimeout(()=>{
     showStepBox("step2Box");
-    // glow known bracket (we "use" it)
-    const brK=document.getElementById("brKnown");
-    if(brK){ brK.classList.add("glow"); }
+    // highlight known group briefly (so klar ist: DAS ist die gegebene Menge)
+    const knownIdxs=[];
+    if(task.knownSide==="A"){
+      for(let i=0;i<c.aa;i++) knownIdxs.push(i);
+    }else{
+      for(let i=c.aa;i<c.aa+c.bb;i++) knownIdxs.push(i);
+    }
+    clearMarks();
+    highlightQtyGroup(knownIdxs);
+    dimNonGroup(knownIdxs);
   }, step2Delay));
 
-  timers.push(setTimeout(()=>fillPartsThenSolveX(task), fillDelay));
+  timers.push(setTimeout(()=>fillPartsThenSolve(task), fillDelay));
 }
 
-function fillPartsThenSolveX(task){
+function fillPartsThenSolve(task){
   stopAnimation();
   const c=compute(task);
 
-  // show known & ask brackets
-  const brK=document.getElementById("brKnown");
-  const brA=document.getElementById("brAsk");
-  if(brK) brK.classList.add("show");
-  if(brA) brA.classList.add("show");
-
-  // Start: qty numbers empty
   setAllQtyNumbers("");
-  clearPartMarks();
+  clearMarks();
 
   const one=fmt(c.onePart);
   const sum=c.sum;
@@ -478,40 +417,30 @@ function fillPartsThenSolveX(task){
   const perPartDelay=520;
   const highlightHold=330;
 
-  // Fill each part with "onePart"
   for(let i=0;i<sum;i++){
     timers.push(setTimeout(()=>{
-      clearPartMarks();
-      markQtyPart(i,"highlight");
+      clearMarks();
+      highlightQtyPart(i);
       setQtyNumber(i, one);
     }, startDelay + i*perPartDelay));
 
-    timers.push(setTimeout(()=>{
-      unmarkQtyPart(i,"highlight");
-    }, startDelay + i*perPartDelay + highlightHold));
+    timers.push(setTimeout(()=>unhighlightQtyPart(i), startDelay + i*perPartDelay + highlightHold));
   }
 
   const afterFill = startDelay + sum*perPartDelay + 650;
 
   timers.push(setTimeout(()=>{
-    // Now focus on asked group => show step3 + compute x
     showStepBox("step3Box");
 
-    const idxs=[];
+    const askIdxs=[];
     if(task.askSide==="A"){
-      for(let i=0;i<c.aa;i++) idxs.push(i);
+      for(let i=0;i<c.aa;i++) askIdxs.push(i);
     }else{
-      for(let i=c.aa;i<c.aa+c.bb;i++) idxs.push(i);
+      for(let i=c.aa;i<c.aa+c.bb;i++) askIdxs.push(i);
     }
-
-    clearPartMarks();
-    highlightQtyGroup(idxs);
-    dimNonGroup(idxs);
-
-    // glow ask bracket and replace x with result
-    if(brA) brA.classList.add("glow");
-    const brAskLabel=document.getElementById("brAskLabel");
-    if(brAskLabel) brAskLabel.textContent = `${fmt(c.result)}${task.unit}`;
+    clearMarks();
+    highlightQtyGroup(askIdxs);
+    dimNonGroup(askIdxs);
   }, afterFill));
 }
 
@@ -564,10 +493,7 @@ const tasks = [
 ];
 
 /* ========= UI State ========= */
-let idx=0;
-let graded=0;
-let correct=0;
-let answered=false;
+let idx=0, graded=0, correct=0, answered=false;
 
 const scoreEl=document.getElementById("score");
 const metaEl=document.getElementById("meta");
@@ -609,12 +535,11 @@ function render(){
   promptEl.textContent=`Wie viel ist ${askName}?`;
 
   unitTag.textContent=t.unit;
-  hintEl.textContent="Tipp: Oben siehst du nur die Teile. Unten siehst du die echten Mengen. Erst „pro Teil“, dann die gesuchte Klammer.";
+  hintEl.textContent="Tipp: Unten wird der Balken länger/kürzer je nachdem, wie groß 1 Teil ist. Erst „pro Teil“, dann die gesuchte Gruppe.";
 
   renderTwoBars(vizEl, t);
   renderSteps(stepsEl, t);
 
-  // focus
   setTimeout(()=>ansEl.focus(), 50);
 }
 
@@ -626,19 +551,14 @@ function lockAndRevealSteps(t){
     showStepBox("step2Box");
     showStepBox("step3Box");
 
-    // ohne Animation: fülle sofort + löse x
     const c=compute(t);
-    const one=fmt(c.onePart);
-    setAllQtyNumbers(one);
+    setAllQtyNumbers(fmt(c.onePart));
 
     const askIdxs=[];
     if(t.askSide==="A"){ for(let i=0;i<c.aa;i++) askIdxs.push(i); }
     else{ for(let i=c.aa;i<c.aa+c.bb;i++) askIdxs.push(i); }
     highlightQtyGroup(askIdxs);
     dimNonGroup(askIdxs);
-
-    const brAskLabel=document.getElementById("brAskLabel");
-    if(brAskLabel) brAskLabel.textContent=`${fmt(c.result)}${t.unit}`;
   }
 }
 
