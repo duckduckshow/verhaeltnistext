@@ -223,11 +223,38 @@ function renderViz(task){
   const showB = (!unknownOnA) ? `?${task.unit}` : ((!AisKnown) ? `${fmt(task.knownValue)}${task.unit}` : `?${task.unit}`);
 
   const viz = document.getElementById("viz");
-  viz.innerHTML = `
-    <div class="vizTitle">So liest du es: <b>Teile</b> oben, <b>Wert</b> direkt darunter.</div>
+ function renderViz(task){
+  const c = compute(task);
 
-    <div class="grid2">
-      <div class="block" id="blockA" style="--bg: var(--A);">
+  const maxParts = Math.max(c.aa, c.bb);
+  const widthA = (c.aa / maxParts) * 100;
+  const widthB = (c.bb / maxParts) * 100;
+
+  const unknownOnA = task.askSide === "A";
+
+  const showA = unknownOnA
+    ? `?${task.unit}`
+    : (task.knownSide==="A"
+        ? `${fmt(task.knownValue)}${task.unit}`
+        : `?${task.unit}`);
+
+  const showB = !unknownOnA
+    ? `?${task.unit}`
+    : (task.knownSide==="B"
+        ? `${fmt(task.knownValue)}${task.unit}`
+        : `?${task.unit}`);
+
+  const viz = document.getElementById("viz");
+  viz.innerHTML = `
+    <div class="vizTitle">
+      Teile oben, Wert darunter.
+      Der größere Anteil ist auch optisch größer.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <div class="block" id="blockA"
+           style="--bg: var(--A); width:${widthA}%; align-self:flex-start;">
         <div class="blockTop">
           <div class="name">${task.nameA}</div>
           <div class="parts">${c.aa} <small>Teile</small></div>
@@ -237,7 +264,8 @@ function renderViz(task){
         </div>
       </div>
 
-      <div class="block" id="blockB" style="--bg: var(--B);">
+      <div class="block" id="blockB"
+           style="--bg: var(--B); width:${widthB}%; align-self:flex-start;">
         <div class="blockTop">
           <div class="name">${task.nameB}</div>
           <div class="parts">${c.bb} <small>Teile</small></div>
@@ -246,15 +274,17 @@ function renderViz(task){
           <span class="pill" id="valB">${showB}</span>
         </div>
       </div>
+
     </div>
 
     <div class="sep"></div>
 
     <div class="hint">
-      Tipp: <b>${knownName}</b> ist bekannt → rechne zuerst <b>1 Teil</b>. Dann rechne <b>${askName}</b>.
+      Mehr Teile → größerer Block.
     </div>
   `;
 }
+
 
 /* ===== Calculation panel ===== */
 function renderCalc(task){
