@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Verhältnisaufgaben – Zwei Balken ohne Klammern, Mengenbalken skaliert</title>
+<title>Verhältnisaufgaben – Zwei Balken, 3 feste Größen</title>
 <style>
   *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
   body{margin:0;background:#f4f4f4;display:flex;justify-content:center}
@@ -19,6 +19,7 @@
   .cat{font-size:12px;font-weight:1000;color:#444;margin-bottom:6px}
   .title{font-weight:1000;font-size:16px;margin-bottom:8px}
   .text{font-size:14px;color:#222;line-height:1.35}
+
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-top:12px}
   .col{flex:1 1 560px}
   .stepsPanel{flex:1 1 520px;border:1px solid #e5e5e5;border-radius:12px;background:#fff;padding:12px}
@@ -58,6 +59,7 @@
   .feedback{margin-top:10px;font-weight:1000;min-height:22px}
   .hint{font-size:12px;color:#555;font-weight:800;margin-top:6px}
   .controls{margin-top:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .switch{display:inline-flex;align-items:center;gap:8px;font-weight:900;user-select:none}
 
   :root{
     --A: rgba(255, 120, 120, .78);
@@ -69,16 +71,26 @@
   .vizCard{border:1px solid #e5e5e5;border-radius:12px;padding:12px;background:#fcfcfc}
   .vizTitle{font-weight:1000;margin-bottom:10px;font-size:13px;color:#222}
   .vizBlock{margin-top:10px}
-  .barWrap{position:relative}
+  .subTitle{font-weight:1000;font-size:12px;color:#333;margin:10px 0 6px}
+  .tiny{font-size:12px;color:#666;font-weight:800}
+
   .bar{
-    width:100%;height:72px;border:2px solid var(--outline);
-    border-radius:14px;overflow:hidden;display:flex;background:#fff;
+    width:100%;
+    height:72px;
+    border:2px solid var(--outline);
+    border-radius:14px;
+    overflow:hidden;
+    display:flex;
+    background:#fff;
   }
   .part{
-    height:100%;border-right:1px solid rgba(0,0,0,.25);
+    height:100%;
+    border-right:1px solid rgba(0,0,0,.25);
     display:flex;align-items:center;justify-content:center;
-    font-weight:1000;font-size:18px;color:#111;user-select:none;
-    position:relative;transition:outline .18s ease, transform .18s ease, filter .18s ease, opacity .18s ease;
+    font-weight:1000;font-size:18px;color:#111;
+    position:relative;
+    transition:outline .18s ease, transform .18s ease, filter .18s ease, opacity .18s ease;
+    user-select:none;
   }
   .part:last-child{border-right:none}
   .partA{background:var(--A)}
@@ -107,14 +119,17 @@
   .dot{width:10px;height:10px;border-radius:999px;display:inline-block;border:1px solid rgba(0,0,0,.25)}
   .dotA{background:var(--A)} .dotB{background:var(--B)}
 
-  .subTitle{font-weight:1000;font-size:12px;color:#333;margin:10px 0 6px}
-  .tiny{font-size:12px;color:#666;font-weight:800}
-  .switch{display:inline-flex;align-items:center;gap:8px;font-weight:900;user-select:none}
-
-  /* Mengenbalken-Skalierung */
-  .qtyScale{
-    transform-origin:left center;
-    transition: transform .35s ease;
+  /* ===== 2. Balken: nur 3 feste Größen ===== */
+  .qtyWrap{
+    border-radius:16px;
+    padding:6px;
+    background:#fff;
+  }
+  .qtySmall{ width: 86%; }
+  .qtyNormal{ width: 100%; }
+  .qtyLarge{ width: 114%; }
+  .qtyWrapInner{
+    margin: 0 auto;   /* zentriert, falls kleiner oder größer */
   }
 
   @media (max-width:980px){
@@ -124,9 +139,10 @@
   }
 </style>
 </head>
+
 <body>
 <div class="app">
-  <h1>Verhältnisaufgaben – zwei Balken (ohne Klammern), Mengenbalken skaliert</h1>
+  <h1>Verhältnisaufgaben – zwei Balken (3 feste Größen beim Mengenbalken)</h1>
 
   <div class="top">
     <div class="score" id="score">Richtig: 0 / 0</div>
@@ -154,6 +170,7 @@
       <button class="btn" id="checkBtn">Prüfen</button>
       <label class="switch"><input type="checkbox" id="animToggle" checked /> Animation</label>
     </div>
+
     <div class="hint" id="hint"></div>
     <div class="feedback" id="feedback"></div>
 
@@ -165,7 +182,7 @@
 </div>
 
 <script>
-/* ========= Basics ========= */
+/* ========= Helpers ========= */
 function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){const t=a%b;a=b;b=t;}return a||1;}
 function simplifyRatio(a,b){const g=gcd(a,b);return [a/g,b/g];}
 function fmt(x){
@@ -182,7 +199,7 @@ function parseDE(s){
 }
 function nearlyEqual(a,b){return Math.abs(a-b) <= 1e-6;}
 
-/* ========= Animation timers ========= */
+/* ========= State + animation ========= */
 let timers=[];
 function stopAnimation(){
   timers.forEach(t=>clearTimeout(t));
@@ -190,7 +207,7 @@ function stopAnimation(){
   clearMarks();
 }
 function clearMarks(){
-  ["ratioBar","qtyBar"].forEach(id=>{
+  ["qtyBar"].forEach(id=>{
     const bar=document.getElementById(id);
     if(!bar) return;
     [...bar.querySelectorAll(".part")].forEach(p=>p.classList.remove("highlight","groupHighlight","dim"));
@@ -207,23 +224,16 @@ function compute(task){
   return {aa,bb,sum:aa+bb,knownParts,askParts,onePart,result};
 }
 
-/* ========= Scale logic for qty bar =========
-   - Baseline: 1 Teil = 1 Einheit -> scale = 1
-   - Log-Skalierung, damit 1000 nicht alles sprengt
-   - Clamp, damit es im Layout bleibt
-*/
-function clamp(x,lo,hi){return Math.max(lo, Math.min(hi,x));}
-function qtyScaleFromOnePart(onePart){
-  // onePart <= 0 -> fallback
-  const v = Math.max(1e-9, onePart);
-  // log10(1)=0, log10(10)=1, log10(0.1)=-1
-  const k = Math.log10(v);
-  // 0.18 ist "wie stark" es wirken soll; feinjustierbar
-  const scale = 1 + 0.18 * k;
-  return clamp(scale, 0.65, 1.55);
+/* ========= 3-size chooser ========= */
+function qtySizeClass(onePart){
+  // Schwellen kannst du später feinjustieren:
+  // <0.9 => kleiner, >1.1 => größer, sonst normal
+  if(onePart < 0.9) return "qtySmall";
+  if(onePart > 1.1) return "qtyLarge";
+  return "qtyNormal";
 }
 
-/* ========= Visual: TWO bars (no brackets) ========= */
+/* ========= Render visuals ========= */
 function renderTwoBars(vizEl, task){
   const c=compute(task);
   const sum=c.sum;
@@ -236,59 +246,56 @@ function renderTwoBars(vizEl, task){
   const knownName = (task.knownSide==="A") ? task.nameA : task.nameB;
   const askName   = (task.askSide==="A") ? task.nameA : task.nameB;
 
+  const sizeCls = qtySizeClass(c.onePart);
+
   vizEl.innerHTML = `
-    <div class="vizTitle">Zwei Balken: oben „Teile“, unten „Menge“ (Länge abhängig von 1 Teil)</div>
+    <div class="vizTitle">Oben Verhältnis („Teile“), unten Mengen („pro Teil“). Der 2. Balken ist klein/normal/groß als Hinweis.</div>
 
     <div class="vizBlock">
-      <div class="subTitle">1) Teile-Balken (nur Verhältnis <b>${c.aa}:${c.bb}</b>)</div>
-      <div class="barWrap">
-        <div class="bar" id="ratioBar">
-          ${parts.map((p,idx)=>`
-            <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
-              <div class="num">1</div>
-            </div>
-          `).join("")}
-        </div>
+      <div class="subTitle">1) Teile-Balken (Verhältnis <b>${c.aa}:${c.bb}</b>)</div>
+      <div class="bar" id="ratioBar">
+        ${parts.map((p,idx)=>`
+          <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
+            <div class="num">1</div>
+          </div>
+        `).join("")}
       </div>
       <div class="legend">
         <span class="pill"><span class="dot dotA"></span>${task.nameA}: ${c.aa} Teile</span>
         <span class="pill"><span class="dot dotB"></span>${task.nameB}: ${c.bb} Teile</span>
-        <span class="tiny">Insgesamt: ${sum} gleich große Teile</span>
+        <span class="tiny">Insgesamt: ${sum} Teile</span>
       </div>
     </div>
 
     <div class="vizBlock">
-      <div class="subTitle">2) Mengen-Balken (bekannt → „pro Teil“ → gesucht)</div>
-      <div class="tiny" style="margin:0 0 6px 0;">
-        Bekannt: <b>${knownName} = ${fmt(task.knownValue)}${task.unit}</b> &nbsp;|&nbsp;
-        Gesucht: <b>${askName}</b>
-      </div>
+      <div class="subTitle">2) Mengen-Balken (bekannt: <b>${knownName} = ${fmt(task.knownValue)}${task.unit}</b>, gesucht: <b>${askName}</b>)</div>
 
-      <div class="barWrap qtyScale" id="qtyScaleWrap">
-        <div class="bar" id="qtyBar">
-          ${parts.map((p,idx)=>`
-            <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
-              <div class="num"></div>
-            </div>
-          `).join("")}
+      <div class="qtyWrap">
+        <div class="qtyWrapInner ${sizeCls}">
+          <div class="bar" id="qtyBar">
+            ${parts.map((p,idx)=>`
+              <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
+                <div class="num"></div>
+              </div>
+            `).join("")}
+          </div>
         </div>
       </div>
 
-      <div class="tiny" id="scaleInfo" style="margin-top:8px;"></div>
+      <div class="tiny" id="sizeHint" style="margin-top:8px;"></div>
     </div>
   `;
 
-  // scale qty bar based on onePart
-  const scale = qtyScaleFromOnePart(c.onePart);
-  const wrap = document.getElementById("qtyScaleWrap");
-  wrap.style.transform = `scaleX(${scale})`;
-
-  const info = document.getElementById("scaleInfo");
-  info.textContent = `Maßstab-Idee: 1 Teil = ${fmt(c.onePart)}${task.unit} → Mengenbalken ist ${Math.round(scale*100)}% so lang.`;
+  // hint text for size category
+  const sizeHint = document.getElementById("sizeHint");
+  const one = c.onePart;
+  const tag = (one < 0.9) ? "kleiner" : (one > 1.1) ? "größer" : "normal";
+  sizeHint.textContent = `1 Teil = ${fmt(one)}${task.unit} → Mengenbalken ist hier ${tag} (nur als Andeutung).`;
 
   setAllQtyNumbers("");
 }
 
+/* Qty helpers */
 function setAllQtyNumbers(val){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
@@ -297,26 +304,26 @@ function setAllQtyNumbers(val){
 function setQtyNumber(i,val){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
-  const box=bar.querySelector(\`.part[data-idx="\${i}"] .num\`);
+  const box=bar.querySelector(`.part[data-idx="${i}"] .num`);
   if(box) box.textContent=val;
 }
 function highlightQtyPart(i){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
-  const p=bar.querySelector(\`.part[data-idx="\${i}"]\`);
+  const p=bar.querySelector(`.part[data-idx="${i}"]`);
   if(p) p.classList.add("highlight");
 }
 function unhighlightQtyPart(i){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
-  const p=bar.querySelector(\`.part[data-idx="\${i}"]\`);
+  const p=bar.querySelector(`.part[data-idx="${i}"]`);
   if(p) p.classList.remove("highlight");
 }
 function highlightQtyGroup(indices){
   const bar=document.getElementById("qtyBar");
   if(!bar) return;
   indices.forEach(i=>{
-    const p=bar.querySelector(\`.part[data-idx="\${i}"]\`);
+    const p=bar.querySelector(`.part[data-idx="${i}"]`);
     if(p) p.classList.add("groupHighlight");
   });
 }
@@ -330,7 +337,7 @@ function dimNonGroup(indices){
   });
 }
 
-/* ========= Steps panel ========= */
+/* ========= Steps ========= */
 function renderSteps(stepsEl, task){
   const c=compute(task);
   const askName=(task.askSide==="A")?task.nameA:task.nameB;
@@ -375,20 +382,20 @@ function showStepBox(id){
   el.classList.add("stepShown");
 }
 
-/* ========= Post-check animation ========= */
+/* ========= Animation ========= */
 function animateAfterCheck(task){
   stopAnimation();
   const c=compute(task);
 
   const step1Delay=450;
-  const step2Delay=2300;
-  const fillDelay =4300;
+  const step2Delay=2100;
+  const fillDelay =4000;
 
   timers.push(setTimeout(()=>showStepBox("step1Box"), step1Delay));
 
   timers.push(setTimeout(()=>{
     showStepBox("step2Box");
-    // highlight known group briefly (so klar ist: DAS ist die gegebene Menge)
+    // highlight known group
     const knownIdxs=[];
     if(task.knownSide==="A"){
       for(let i=0;i<c.aa;i++) knownIdxs.push(i);
@@ -400,10 +407,10 @@ function animateAfterCheck(task){
     dimNonGroup(knownIdxs);
   }, step2Delay));
 
-  timers.push(setTimeout(()=>fillPartsThenSolve(task), fillDelay));
+  timers.push(setTimeout(()=>fillPartsThenFocusAsk(task), fillDelay));
 }
 
-function fillPartsThenSolve(task){
+function fillPartsThenFocusAsk(task){
   stopAnimation();
   const c=compute(task);
 
@@ -414,8 +421,8 @@ function fillPartsThenSolve(task){
   const sum=c.sum;
 
   const startDelay=350;
-  const perPartDelay=520;
-  const highlightHold=330;
+  const perPartDelay=500;
+  const highlightHold=320;
 
   for(let i=0;i<sum;i++){
     timers.push(setTimeout(()=>{
@@ -427,7 +434,7 @@ function fillPartsThenSolve(task){
     timers.push(setTimeout(()=>unhighlightQtyPart(i), startDelay + i*perPartDelay + highlightHold));
   }
 
-  const afterFill = startDelay + sum*perPartDelay + 650;
+  const afterFill = startDelay + sum*perPartDelay + 600;
 
   timers.push(setTimeout(()=>{
     showStepBox("step3Box");
@@ -492,7 +499,7 @@ const tasks = [
   })
 ];
 
-/* ========= UI State ========= */
+/* ========= UI ========= */
 let idx=0, graded=0, correct=0, answered=false;
 
 const scoreEl=document.getElementById("score");
@@ -535,7 +542,7 @@ function render(){
   promptEl.textContent=`Wie viel ist ${askName}?`;
 
   unitTag.textContent=t.unit;
-  hintEl.textContent="Tipp: Unten wird der Balken länger/kürzer je nachdem, wie groß 1 Teil ist. Erst „pro Teil“, dann die gesuchte Gruppe.";
+  hintEl.textContent="Tipp: Balken 2 ist nur klein/normal/groß – als Hinweis, ob 1 Teil eher klein oder groß ist.";
 
   renderTwoBars(vizEl, t);
   renderSteps(stepsEl, t);
