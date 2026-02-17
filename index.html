@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Verhältnisaufgaben – Zwei Blöcke untereinander (Teile → Wert)</title>
+<title>Verhältnisaufgaben – Teile oben, Wert darunter (Blockbreite nach Teilen)</title>
 <style>
   *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
   body{margin:0;background:#f4f4f4;display:flex;justify-content:center}
@@ -29,13 +29,6 @@
     padding:12px;
   }
   .vizTitle{font-weight:1000;font-size:13px;margin-bottom:10px;color:#222}
-
-  /* ===== 2-Spalten-Layout (A | B) ===== */
-  .grid2{
-    display:grid;
-    grid-template-columns: 1fr 1fr;
-    gap:10px;
-  }
 
   .block{
     border-radius:14px;
@@ -128,7 +121,7 @@
 
   /* Farben per Aufgabe (CSS-Variablen) */
   :root{
-    --A: rgba(235,235,235,.95); /* default */
+    --A: rgba(235,235,235,.95);
     --B: rgba(255,230,120,.90);
   }
 </style>
@@ -148,7 +141,6 @@
     <div class="text" id="text"></div>
 
     <div class="viz" id="viz"></div>
-
     <div class="calc" id="calc"></div>
 
     <div class="prompt" id="prompt"></div>
@@ -198,7 +190,7 @@ function compute(task){
   return {aa, bb, knownParts, askParts, onePart, result};
 }
 
-/* ===== Visual render ===== */
+/* ===== Visual render (BLOCKBREITE nach Teilen) ===== */
 function applyColors(task){
   document.documentElement.style.setProperty("--A", task.colorA);
   document.documentElement.style.setProperty("--B", task.colorB);
@@ -207,29 +199,12 @@ function applyColors(task){
 function renderViz(task){
   const c = compute(task);
 
-  const AisKnown = task.knownSide === "A";
-  const AisAsk   = task.askSide === "A";
-
-  const knownName = AisKnown ? task.nameA : task.nameB;
-  const askName   = AisAsk ? task.nameA : task.nameB;
-
-  const valA = AisKnown ? `${fmt(task.knownValue)}${task.unit}` : `?${task.unit}`;
-  const valB = (!AisKnown) ? `${fmt(task.knownValue)}${task.unit}` : `?${task.unit}`;
-
-  // Wenn gesuchte Seite A ist, dann steht ? unter A, sonst unter B.
-  // (bekannte Seite kann A oder B sein)
-  const unknownOnA = task.askSide === "A";
-  const showA = unknownOnA ? `?${task.unit}` : (AisKnown ? `${fmt(task.knownValue)}${task.unit}` : `?${task.unit}`);
-  const showB = (!unknownOnA) ? `?${task.unit}` : ((!AisKnown) ? `${fmt(task.knownValue)}${task.unit}` : `?${task.unit}`);
-
-  const viz = document.getElementById("viz");
- function renderViz(task){
-  const c = compute(task);
-
+  // Breiten: relativ zum größeren Anteil (ruhig, nie extrem)
   const maxParts = Math.max(c.aa, c.bb);
   const widthA = (c.aa / maxParts) * 100;
   const widthB = (c.bb / maxParts) * 100;
 
+  // Was steht unter A/B? (bekannt bzw. ? unter der gesuchten Seite)
   const unknownOnA = task.askSide === "A";
 
   const showA = unknownOnA
@@ -247,12 +222,10 @@ function renderViz(task){
   const viz = document.getElementById("viz");
   viz.innerHTML = `
     <div class="vizTitle">
-      Teile oben, Wert darunter.
-      Der größere Anteil ist auch optisch größer.
+      Teile oben, Wert darunter. Der kleinere Anteil ist auch optisch kleiner.
     </div>
 
     <div style="display:flex;flex-direction:column;gap:12px;">
-
       <div class="block" id="blockA"
            style="--bg: var(--A); width:${widthA}%; align-self:flex-start;">
         <div class="blockTop">
@@ -274,17 +247,15 @@ function renderViz(task){
           <span class="pill" id="valB">${showB}</span>
         </div>
       </div>
-
     </div>
 
     <div class="sep"></div>
 
     <div class="hint">
-      Mehr Teile → größerer Block.
+      Merke: <b>mehr Teile → breiterer Block</b>.
     </div>
   `;
 }
-
 
 /* ===== Calculation panel ===== */
 function renderCalc(task){
@@ -370,7 +341,6 @@ function animateSolve(task){
   }, 400));
 
   timers.push(setTimeout(()=>{
-    // Jetzt ? durch Ergebnis ersetzen
     clearHL();
     focusAsk(task);
     const c=compute(task);
@@ -494,9 +464,6 @@ function render(){
   renderViz(t);
   renderCalc(t);
 
-  // set unknown display fresh (in case previous task replaced ?)
-  renderViz(t);
-
   setTimeout(()=>ansEl.focus(), 50);
 }
 
@@ -518,16 +485,13 @@ function check(){
   if(ok) correct++;
   updateTop();
 
-  // show calc + animate
   if(animToggle.checked){
     animateSolve(t);
   }else{
     showCalc(false);
-    // replace ? immediately
     const target = (t.askSide==="A") ? "valA" : "valB";
     const el=document.getElementById(target);
     if(el) el.textContent = `${fmt(c.result)}${t.unit}`;
-    // focus ask
     clearHL();
     focusAsk(t);
   }
