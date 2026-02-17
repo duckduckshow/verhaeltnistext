@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Verhältnisaufgaben – Zwei Balken, 3 feste Größen</title>
+<title>Verhältnisaufgaben – Zwei Balken (3 feste Größen), ohne Klammern</title>
 <style>
   *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
   body{margin:0;background:#f4f4f4;display:flex;justify-content:center}
@@ -25,7 +25,7 @@
   .stepsPanel{flex:1 1 520px;border:1px solid #e5e5e5;border-radius:12px;background:#fff;padding:12px}
 
   .stepsTitle{font-weight:1000;font-size:14px;margin-bottom:10px}
-  .stepsGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:stretch}
+  .stepsGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:stretch}
   .stepBox{border:1px solid #eee;background:#fafafa;border-radius:12px;padding:10px;min-height:112px}
   .stepNr{font-weight:1000;font-size:13px;margin-bottom:6px}
   .stepText{font-weight:1000;font-size:14px;margin-bottom:6px}
@@ -37,10 +37,8 @@
   .eq .hl{background:rgba(255,215,0,.25);padding:0 4px;border-radius:6px}
   .stepHidden{opacity:0;transform:translateY(6px);pointer-events:none}
   .stepShown{opacity:1;transform:translateY(0);pointer-events:auto;transition:opacity .35s ease, transform .35s ease}
-  .step3A{background:rgba(255,120,120,.14)!important;border-color:rgba(255,120,120,.35)!important}
-  .step3B{background:rgba(120,170,255,.14)!important;border-color:rgba(120,170,255,.35)!important}
-  .eqA{border-color:rgba(255,120,120,.55)!important}
-  .eqB{border-color:rgba(120,170,255,.55)!important}
+  .stepAskA{background:rgba(120,170,255,.12)!important;border-color:rgba(120,170,255,.35)!important}
+  .stepAskB{background:rgba(255,120,120,.12)!important;border-color:rgba(255,120,120,.35)!important}
 
   .prompt{margin-top:10px;font-weight:1000;font-size:14px}
   .inputRow{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -73,6 +71,17 @@
   .vizBlock{margin-top:10px}
   .subTitle{font-weight:1000;font-size:12px;color:#333;margin:10px 0 6px}
   .tiny{font-size:12px;color:#666;font-weight:800}
+
+  /* ===== Balken: Rahmen + Innenbreite, damit nichts überläuft ===== */
+  .barFrame{
+    width:100%;
+    display:flex;
+    justify-content:center;
+  }
+  .barInner{
+    width:100%;
+    max-width: 980px;   /* <- hier wird’s stabil */
+  }
 
   .bar{
     width:100%;
@@ -119,22 +128,12 @@
   .dot{width:10px;height:10px;border-radius:999px;display:inline-block;border:1px solid rgba(0,0,0,.25)}
   .dotA{background:var(--A)} .dotB{background:var(--B)}
 
-  /* ===== 2. Balken: nur 3 feste Größen ===== */
-  .qtyWrap{
-    border-radius:16px;
-    padding:6px;
-    background:#fff;
-  }
-  .qtySmall{ width: 86%; }
-  .qtyNormal{ width: 100%; }
-  .qtyLarge{ width: 114%; }
-  .qtyWrapInner{
-    margin: 0 auto;   /* zentriert, falls kleiner oder größer */
-  }
+  /* ===== 2. Balken: 3 feste Größen (IM Inneren), groß = 100% ===== */
+  .qtyInnerSmall{ width: 86%; }
+  .qtyInnerNormal{ width: 93%; }
+  .qtyInnerLarge{ width: 100%; }
 
   @media (max-width:980px){
-    .stepsGrid{grid-template-columns:1fr 1fr}
-    .stepBox:nth-child(3){grid-column:1/-1}
     .eq{white-space:normal}
   }
 </style>
@@ -142,7 +141,7 @@
 
 <body>
 <div class="app">
-  <h1>Verhältnisaufgaben – zwei Balken (3 feste Größen beim Mengenbalken)</h1>
+  <h1>Verhältnisaufgaben – zwei Balken (stabil), Verhältnisgleichung als Verhältnis</h1>
 
   <div class="top">
     <div class="score" id="score">Richtig: 0 / 0</div>
@@ -199,7 +198,7 @@ function parseDE(s){
 }
 function nearlyEqual(a,b){return Math.abs(a-b) <= 1e-6;}
 
-/* ========= State + animation ========= */
+/* ========= Animation ========= */
 let timers=[];
 function stopAnimation(){
   timers.forEach(t=>clearTimeout(t));
@@ -207,11 +206,9 @@ function stopAnimation(){
   clearMarks();
 }
 function clearMarks(){
-  ["qtyBar"].forEach(id=>{
-    const bar=document.getElementById(id);
-    if(!bar) return;
-    [...bar.querySelectorAll(".part")].forEach(p=>p.classList.remove("highlight","groupHighlight","dim"));
-  });
+  const bar=document.getElementById("qtyBar");
+  if(!bar) return;
+  [...bar.querySelectorAll(".part")].forEach(p=>p.classList.remove("highlight","groupHighlight","dim"));
 }
 
 /* ========= Compute ========= */
@@ -226,11 +223,42 @@ function compute(task){
 
 /* ========= 3-size chooser ========= */
 function qtySizeClass(onePart){
-  // Schwellen kannst du später feinjustieren:
-  // <0.9 => kleiner, >1.1 => größer, sonst normal
-  if(onePart < 0.9) return "qtySmall";
-  if(onePart > 1.1) return "qtyLarge";
-  return "qtyNormal";
+  if(onePart < 0.9) return "qtyInnerSmall";
+  if(onePart > 1.1) return "qtyInnerLarge";
+  return "qtyInnerNormal";
+}
+
+/* ========= Colors per task ========= */
+function applyTaskColors(task){
+  // per Aufgabe setzen (damit Mal-Aufgaben passen)
+  document.documentElement.style.setProperty("--A", task.colorA);
+  document.documentElement.style.setProperty("--B", task.colorB);
+}
+
+/* ========= Verhältnisgleichung als Verhältnis ========= */
+function ratioEquation(task, c){
+  // Grundverhältnis
+  const base = `${task.nameA} : ${task.nameB} = ${c.aa} : ${c.bb}`;
+
+  // Aufgabengleichung so, dass x immer zur gesuchten Seite gehört
+  // Fälle:
+  // - known=A, ask=B  => knownValue : x = a : b
+  // - known=B, ask=A  => x : knownValue = a : b
+  // - (askSide immer die andere)
+  const knownVal = `${fmt(task.knownValue)}${task.unit}`;
+  let eq;
+
+  if(task.knownSide === "A" && task.askSide === "B"){
+    eq = `${knownVal} : x = ${c.aa} : ${c.bb}`;
+  } else if(task.knownSide === "B" && task.askSide === "A"){
+    eq = `x : ${knownVal} = ${c.aa} : ${c.bb}`;
+  } else if(task.knownSide === "A" && task.askSide === "A"){
+    eq = `x : ${knownVal} = ${c.aa} : ${c.bb}`; // sollte nicht passieren
+  } else {
+    eq = `${knownVal} : x = ${c.aa} : ${c.bb}`; // fallback
+  }
+
+  return { base, eq };
 }
 
 /* ========= Render visuals ========= */
@@ -249,16 +277,20 @@ function renderTwoBars(vizEl, task){
   const sizeCls = qtySizeClass(c.onePart);
 
   vizEl.innerHTML = `
-    <div class="vizTitle">Oben Verhältnis („Teile“), unten Mengen („pro Teil“). Der 2. Balken ist klein/normal/groß als Hinweis.</div>
+    <div class="vizTitle">Oben Verhältnis („Teile“), unten Mengen („pro Teil“). Balken 2 ist klein/normal/groß als Hinweis.</div>
 
     <div class="vizBlock">
       <div class="subTitle">1) Teile-Balken (Verhältnis <b>${c.aa}:${c.bb}</b>)</div>
-      <div class="bar" id="ratioBar">
-        ${parts.map((p,idx)=>`
-          <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
-            <div class="num">1</div>
+      <div class="barFrame">
+        <div class="barInner">
+          <div class="bar" id="ratioBar">
+            ${parts.map((p,idx)=>`
+              <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
+                <div class="num">1</div>
+              </div>
+            `).join("")}
           </div>
-        `).join("")}
+        </div>
       </div>
       <div class="legend">
         <span class="pill"><span class="dot dotA"></span>${task.nameA}: ${c.aa} Teile</span>
@@ -270,14 +302,16 @@ function renderTwoBars(vizEl, task){
     <div class="vizBlock">
       <div class="subTitle">2) Mengen-Balken (bekannt: <b>${knownName} = ${fmt(task.knownValue)}${task.unit}</b>, gesucht: <b>${askName}</b>)</div>
 
-      <div class="qtyWrap">
-        <div class="qtyWrapInner ${sizeCls}">
-          <div class="bar" id="qtyBar">
-            ${parts.map((p,idx)=>`
-              <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
-                <div class="num"></div>
-              </div>
-            `).join("")}
+      <div class="barFrame">
+        <div class="barInner">
+          <div class="${sizeCls}" style="margin:0 auto;">
+            <div class="bar" id="qtyBar">
+              ${parts.map((p,idx)=>`
+                <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
+                  <div class="num"></div>
+                </div>
+              `).join("")}
+            </div>
           </div>
         </div>
       </div>
@@ -286,7 +320,6 @@ function renderTwoBars(vizEl, task){
     </div>
   `;
 
-  // hint text for size category
   const sizeHint = document.getElementById("sizeHint");
   const one = c.onePart;
   const tag = (one < 0.9) ? "kleiner" : (one > 1.1) ? "größer" : "normal";
@@ -337,41 +370,36 @@ function dimNonGroup(indices){
   });
 }
 
-/* ========= Steps ========= */
+/* ========= Steps (ohne "Schritt 1: a+b") ========= */
 function renderSteps(stepsEl, task){
   const c=compute(task);
   const askName=(task.askSide==="A")?task.nameA:task.nameB;
   const knownName=(task.knownSide==="A")?task.nameA:task.nameB;
 
-  const step3Class=(task.askSide==="A")?"step3A":"step3B";
-  const eq3Class=(task.askSide==="A")?"eqA":"eqB";
+  const askClass = (task.askSide==="A") ? "stepAskA" : "stepAskB";
+  const eqs = ratioEquation(task, c);
 
   stepsEl.innerHTML=`
     <div class="stepsTitle">Rechnung (erscheint nach dem Prüfen)</div>
     <div class="stepsGrid">
-      <div class="stepBox stepHidden" id="step1Box">
-        <div class="stepNr">Schritt 1</div>
-        <div class="stepText">Teile ablesen</div>
-        <div class="eq"><span class="hl">${c.aa}</span> + <span class="hl">${c.bb}</span> = <span class="hl">${c.sum}</span></div>
-      </div>
-
       <div class="stepBox stepHidden" id="step2Box">
-        <div class="stepNr">Schritt 2</div>
+        <div class="stepNr">Schritt 1</div>
         <div class="stepText">Wert pro Teil</div>
         <div class="eq"><span class="hl">${fmt(task.knownValue)}</span> : <span class="hl">${c.knownParts}</span> = <span class="hl">${fmt(c.onePart)}</span>${task.unit}</div>
         <div class="tiny">${knownName} hat ${c.knownParts} Teile.</div>
       </div>
 
-      <div class="stepBox stepHidden ${step3Class}" id="step3Box">
-        <div class="stepNr">Schritt 3</div>
+      <div class="stepBox stepHidden ${askClass}" id="step3Box">
+        <div class="stepNr">Schritt 2</div>
         <div class="stepText">${askName} berechnen</div>
-        <div class="eq ${eq3Class}"><span class="hl">${fmt(c.onePart)}</span> · <span class="hl">${c.askParts}</span> = <span class="hl">${fmt(c.result)}</span>${task.unit}</div>
+        <div class="eq"><span class="hl">${fmt(c.onePart)}</span> · <span class="hl">${c.askParts}</span> = <span class="hl">${fmt(c.result)}</span>${task.unit}</div>
         <div class="tiny">${askName} hat ${c.askParts} Teile.</div>
       </div>
     </div>
 
     <div class="tiny" style="margin-top:10px;">
-      Verhältnisgleichung: <b>${knownName}</b> / ${c.knownParts} = <b>x</b> / ${c.askParts}
+      <b>Verhältnis:</b> ${eqs.base}<br>
+      <b>Verhältnisgleichung:</b> ${eqs.eq}
     </div>
   `;
 }
@@ -387,21 +415,17 @@ function animateAfterCheck(task){
   stopAnimation();
   const c=compute(task);
 
-  const step1Delay=450;
-  const step2Delay=2100;
-  const fillDelay =4000;
-
-  timers.push(setTimeout(()=>showStepBox("step1Box"), step1Delay));
+  const step2Delay=650;
+  const fillDelay =2600;
 
   timers.push(setTimeout(()=>{
     showStepBox("step2Box");
-    // highlight known group
+
+    // bekannte Gruppe kurz markieren
     const knownIdxs=[];
-    if(task.knownSide==="A"){
-      for(let i=0;i<c.aa;i++) knownIdxs.push(i);
-    }else{
-      for(let i=c.aa;i<c.aa+c.bb;i++) knownIdxs.push(i);
-    }
+    if(task.knownSide==="A"){ for(let i=0;i<c.aa;i++) knownIdxs.push(i); }
+    else{ for(let i=c.aa;i<c.aa+c.bb;i++) knownIdxs.push(i); }
+
     clearMarks();
     highlightQtyGroup(knownIdxs);
     dimNonGroup(knownIdxs);
@@ -440,11 +464,9 @@ function fillPartsThenFocusAsk(task){
     showStepBox("step3Box");
 
     const askIdxs=[];
-    if(task.askSide==="A"){
-      for(let i=0;i<c.aa;i++) askIdxs.push(i);
-    }else{
-      for(let i=c.aa;i<c.aa+c.bb;i++) askIdxs.push(i);
-    }
+    if(task.askSide==="A"){ for(let i=0;i<c.aa;i++) askIdxs.push(i); }
+    else{ for(let i=c.aa;i<c.aa+c.bb;i++) askIdxs.push(i); }
+
     clearMarks();
     highlightQtyGroup(askIdxs);
     dimNonGroup(askIdxs);
@@ -452,9 +474,18 @@ function fillPartsThenFocusAsk(task){
 }
 
 /* ========= Tasks ========= */
-function makeTask({cat,title,context,nameA,nameB,rA,rB,knownSide,knownValue,askSide,unit}){
-  return {cat,title,context,nameA,nameB,rA,rB,knownSide,knownValue,askSide,unit:unit||""};
+function makeTask({cat,title,context,nameA,nameB,rA,rB,knownSide,knownValue,askSide,unit,colorA,colorB}){
+  return {cat,title,context,nameA,nameB,rA,rB,knownSide,knownValue,askSide,unit:unit||"",colorA,colorB};
 }
+
+// Farben passend zu Mal-Aufgaben
+const COLORS = {
+  white: "rgba(235, 235, 235, .95)",   // sichtbar auf weißem Hintergrund
+  yellow:"rgba(255, 230, 120, .90)",
+  lightblue:"rgba(150, 205, 255, .90)",
+  red:"rgba(255, 120, 120, .78)",
+  blue:"rgba(120, 170, 255, .78)"
+};
 
 const tasks = [
   makeTask({
@@ -465,7 +496,9 @@ const tasks = [
     rA:5, rB:2,
     knownSide:"B", knownValue:2,
     askSide:"A",
-    unit:" L"
+    unit:" L",
+    colorA: COLORS.white,
+    colorB: COLORS.yellow
   }),
   makeTask({
     cat:"Farbe mischen",
@@ -475,7 +508,9 @@ const tasks = [
     rA:3, rB:1,
     knownSide:"B", knownValue:0.5,
     askSide:"A",
-    unit:" L"
+    unit:" L",
+    colorA: COLORS.lightblue,
+    colorB: COLORS.white
   }),
   makeTask({
     cat:"Erbschaft",
@@ -485,7 +520,9 @@ const tasks = [
     rA:3, rB:2,
     knownSide:"A", knownValue:3000,
     askSide:"B",
-    unit:" €"
+    unit:" €",
+    colorA: COLORS.red,
+    colorB: COLORS.blue
   }),
   makeTask({
     cat:"Erbschaft",
@@ -495,7 +532,9 @@ const tasks = [
     rA:9, rB:8,
     knownSide:"B", knownValue:720,
     askSide:"A",
-    unit:" €"
+    unit:" €",
+    colorA: COLORS.red,
+    colorB: COLORS.blue
   })
 ];
 
@@ -532,6 +571,7 @@ function render(){
   ansEl.value="";
 
   const t=tasks[idx];
+  applyTaskColors(t);
   updateTop();
 
   catEl.textContent=t.cat;
@@ -542,7 +582,7 @@ function render(){
   promptEl.textContent=`Wie viel ist ${askName}?`;
 
   unitTag.textContent=t.unit;
-  hintEl.textContent="Tipp: Balken 2 ist nur klein/normal/groß – als Hinweis, ob 1 Teil eher klein oder groß ist.";
+  hintEl.textContent="Tipp: Schritt „a+b“ ist oft unnötig, wenn NICHT die Gesamtsumme gegeben ist. Wir rechnen direkt über „pro Teil“.";
 
   renderTwoBars(vizEl, t);
   renderSteps(stepsEl, t);
@@ -554,7 +594,6 @@ function lockAndRevealSteps(t){
   if(animToggle.checked){
     animateAfterCheck(t);
   }else{
-    showStepBox("step1Box");
     showStepBox("step2Box");
     showStepBox("step3Box");
 
