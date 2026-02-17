@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verhältnisaufgaben – Balkenmodell + Schritte + Animation</title>
+<style>
+  *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+  body{margin:0;background:#f4f4f4;display:flex;justify-content:center}
+  .app{
+    background:#fff;max-width:1120px;width:100%;
+    margin:12px;padding:12px;border-radius:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,.08);
+  }
+  h1{margin:6px 0 12px;text-align:center;font-size:18px}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .meta,.score{font-size:12px;color:#555;font-weight:900}
+  .card{margin-top:10px;border:1px solid #e5e5e5;border-radius:12px;padding:12px;background:#fff}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+  .col{flex:1 1 520px}
+  .smallcol{flex:1 1 360px}
+  .cat{font-size:12px;font-weight:1000;color:#444;margin-bottom:6px}
+  .title{font-weight:1000;font-size:16px;margin-bottom:8px}
+  .text{font-size:14px;color:#222;line-height:1.35}
+  .prompt{margin-top:10px;font-weight:1000;font-size:14px}
+  .inputRow{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input[type="text"], input[type="number"], select{
+    padding:10px;border-radius:12px;border:1px solid #ccc;background:#fff;
+    font-size:14px;min-width:120px;
+  }
+  .btn{
+    padding:10px 12px;border:none;border-radius:12px;
+    background:#007bff;color:#fff;cursor:pointer;font-size:13px;font-weight:900;
+  }
+  .btn:hover{background:#0062cc}
+  .btn.secondary{background:#222}
+  .btn.secondary:hover{background:#000}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .feedback{margin-top:10px;font-weight:1000;min-height:22px}
+  .hint{font-size:12px;color:#555;font-weight:800;margin-top:6px}
+
+  :root{
+    --A: rgba(255, 120, 120, .75);
+    --B: rgba(120, 170, 255, .75);
+    --outline:#333;
+    --glow: rgba(255, 215, 0, .95);
+  }
+
+  .vizCard{
+    border:1px solid #e5e5e5;border-radius:12px;padding:12px;background:#fcfcfc;
+  }
+  .vizTitle{font-weight:1000;margin-bottom:10px;font-size:13px;color:#222}
+  .bar{
+    width:100%;height:76px;border:2px solid var(--outline);
+    border-radius:14px;overflow:hidden;display:flex;background:#fff;
+  }
+  .part{
+    height:100%;border-right:1px solid rgba(0,0,0,.25);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:1000;font-size:18px;color:#111;user-select:none;
+    position:relative;
+    transition:outline .18s ease, transform .18s ease, filter .18s ease;
+  }
+  .part:last-child{border-right:none}
+  .partA{background:var(--A)}
+  .partB{background:var(--B)}
+  .part.highlight{
+    outline:5px solid var(--glow);outline-offset:-5px;
+    transform:translateY(-1px) scale(1.01);
+    filter:brightness(1.03);z-index:1;
+  }
+  .part.groupHighlight{
+    outline:5px solid var(--glow);outline-offset:-5px;filter:brightness(1.03);
+  }
+  .part .num{
+    padding:3px 12px;border-radius:999px;
+    background:rgba(255,255,255,.85);
+    border:1px solid rgba(0,0,0,.25);
+    min-width:40px;text-align:center;
+  }
+  .legend{margin-top:10px;font-size:12px;color:#444;line-height:1.25}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 12px;border-radius:999px;border:1px solid #ddd;
+    background:#fff;font-weight:1000;margin-right:10px;margin-bottom:6px;
+  }
+  .dot{width:10px;height:10px;border-radius:999px;display:inline-block;border:1px solid rgba(0,0,0,.25)}
+  .dotA{background:var(--A)} .dotB{background:var(--B)}
+
+  .stepsPanel{
+    border:1px solid #e5e5e5;border-radius:12px;background:#fff;
+    padding:12px;
+  }
+  .stepsTitle{font-weight:1000;font-size:14px;margin-bottom:10px}
+  .stepsGrid{
+    display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:stretch;
+  }
+  .stepBox{
+    border:1px solid #eee;background:#fafafa;border-radius:12px;
+    padding:10px;min-height:112px;
+  }
+  .stepNr{font-weight:1000;font-size:13px;margin-bottom:6px}
+  .stepText{font-weight:1000;font-size:14px;margin-bottom:6px}
+  .eq{
+    display:inline-block;font-weight:1000;font-size:18px;
+    padding:8px 12px;border-radius:12px;background:#fff;border:1px solid #ddd;
+    white-space:nowrap;
+  }
+  .eq .hl{background:rgba(255,215,0,.25);padding:0 4px;border-radius:6px}
+  .stepHidden{opacity:0;transform:translateY(6px);pointer-events:none}
+  .stepShown{opacity:1;transform:translateY(0);pointer-events:auto;transition:opacity .35s ease, transform .35s ease}
+  .step3A{background:rgba(255,120,120,.14)!important;border-color:rgba(255,120,120,.35)!important}
+  .step3B{background:rgba(120,170,255,.14)!important;border-color:rgba(120,170,255,.35)!important}
+  .eqA{border-color:rgba(255,120,120,.55)!important}
+  .eqB{border-color:rgba(120,170,255,.55)!important}
+
+  .controls{margin-top:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .divider{height:1px;background:#eee;margin:12px 0}
+  .miniTitle{font-weight:1000;margin:0 0 8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .note{font-size:12px;color:#666;font-weight:800;line-height:1.3}
+
+  @media (max-width:980px){
+    .stepsGrid{grid-template-columns:1fr 1fr}
+    .stepBox:nth-child(3){grid-column:1/-1}
+    .eq{white-space:normal}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Verhältnisaufgaben (Textaufgaben) – Balkenmodell + Rechnung + Animation</h1>
+
+  <div class="top">
+    <div class="score" id="score">Richtig: 0 / 0</div>
+    <div class="meta" id="meta">0 / 0</div>
+  </div>
+
+  <div class="card">
+    <div class="cat" id="cat"></div>
+    <div class="title" id="title"></div>
+    <div class="text" id="text"></div>
+
+    <div class="row" style="margin-top:12px;">
+      <div class="col">
+        <div class="vizCard" id="viz"></div>
+      </div>
+      <div class="col">
+        <div class="stepsPanel" id="steps"></div>
+      </div>
+    </div>
+
+    <div class="prompt" id="prompt"></div>
+    <div class="inputRow">
+      <label for="ans" style="font-weight:1000;">Dein Ergebnis:</label>
+      <input id="ans" type="text" inputmode="decimal" placeholder="z.B. 1,5" />
+      <span id="unitTag" style="font-weight:1000;"></span>
+      <button class="btn" id="checkBtn">Prüfen</button>
+      <label style="display:inline-flex;align-items:center;gap:8px;font-weight:900;">
+        <input type="checkbox" id="animToggle" checked />
+        Animation
+      </label>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="feedback" id="feedback"></div>
+
+    <div class="controls">
+      <button class="btn secondary" id="restartBtn">Neu starten</button>
+      <button class="btn" id="nextBtn" disabled>Weiter</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="miniTitle">Eigene Aufgabe erstellen</div>
+    <div class="note">
+      Idee: Du gibst Verhältnis, bekannte Menge und fragst nach der anderen Seite. Das Tool baut Text + Visualisierung automatisch.
+    </div>
+    <div style="margin-top:10px;" class="grid2">
+      <div>
+        <label style="font-weight:1000;">Name/Bezeichnung A</label><br>
+        <input id="cNameA" type="text" value="Weiß" />
+      </div>
+      <div>
+        <label style="font-weight:1000;">Name/Bezeichnung B</label><br>
+        <input id="cNameB" type="text" value="Gelb" />
+      </div>
+      <div>
+        <label style="font-weight:1000;">Verhältnis A : B</label><br>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input id="cA" type="number" value="5" min="1" step="1" />
+          <span style="font-weight:1000;">:</span>
+          <input id="cB" type="number" value="2" min="1" step="1" />
+        </div>
+      </div>
+      <div>
+        <label style="font-weight:1000;">Einheit (optional)</label><br>
+        <input id="cUnit" type="text" value=" L" />
+      </div>
+      <div>
+        <label style="font-weight:1000;">Bekannte Seite</label><br>
+        <select id="cKnownSide">
+          <option value="A">A ist bekannt</option>
+          <option value="B" selected>B ist bekannt</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-weight:1000;">Bekannter Wert</label><br>
+        <input id="cKnownVal" type="number" value="2" step="0.1" />
+      </div>
+      <div>
+        <label style="font-weight:1000;">Frage nach …</label><br>
+        <select id="cAskSide">
+          <option value="A" selected>A</option>
+          <option value="B">B</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-weight:1000;">Kontext (optional)</label><br>
+        <input id="cContext" type="text" value="Markus mischt Farben im Verhältnis." />
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn" id="addCustomBtn">Eigene Aufgabe übernehmen</button>
+      <button class="btn secondary" id="resetCustomBtn">Felder zurücksetzen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========= Helpers ========= */
+function gcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ const t=a%b; a=b; b=t; } return a||1; }
+function simplifyRatio(a,b){ const g=gcd(a,b); return [a/g,b/g]; }
+function fmt(x){
+  // runde "schön", aber nicht übertreiben
+  const r = Math.round((x + Number.EPSILON) * 1000) / 1000;
+  return Number.isInteger(r) ? String(r) : String(r).replace(".", ",");
+}
+function parseDE(s){
+  // akzeptiert 1,5 oder 1.5
+  if(typeof s !== "string") return NaN;
+  const t = s.trim().replace(/\s+/g,"").replace(",",".");
+  if(t === "") return NaN;
+  const v = Number(t);
+  return Number.isFinite(v) ? v : NaN;
+}
+function nearlyEqual(a,b){
+  // tolerant bei Kommazahlen
+  const tol = 1e-6;
+  return Math.abs(a-b) <= tol;
+}
+
+/* ========= Animation helpers (Balken) ========= */
+let timers = [];
+function stopAnimation(){
+  timers.forEach(t => clearTimeout(t));
+  timers = [];
+  clearPartMarks();
+}
+function clearPartMarks(){
+  const bar = document.getElementById("bar");
+  if(!bar) return;
+  [...bar.querySelectorAll(".part")].forEach(p => p.classList.remove("highlight","groupHighlight"));
+}
+function setAllPartNumbers(val){
+  const bar = document.getElementById("bar");
+  if(!bar) return;
+  [...bar.querySelectorAll(".part .num")].forEach(n => n.textContent = val);
+}
+function setPartNumber(i,val){
+  const bar = document.getElementById("bar");
+  if(!bar) return;
+  const box = bar.querySelector(`.part[data-idx="${i}"] .num`);
+  if(box) box.textContent = val;
+}
+function highlightPart(i){
+  const bar = document.getElementById("bar");
+  if(!bar) return;
+  const p = bar.querySelector(`.part[data-idx="${i}"]`);
+  if(p) p.classList.add("highlight");
+}
+function unhighlightPart(i){
+  const bar = document.getElementById("bar");
+  if(!bar) return;
+  const p = bar.querySelector(`.part[data-idx="${i}"]`);
+  if(p) p.classList.remove("highlight");
+}
+function highlightGroup(indices){
+  const bar = document.getElementById("bar");
+  if(!bar) return;
+  indices.forEach(i=>{
+    const p = bar.querySelector(`.part[data-idx="${i}"]`);
+    if(p) p.classList.add("groupHighlight");
+  });
+}
+
+/* ========= Render: Balkenmodell ========= */
+function renderBarModel(el, task){
+  const [aa, bb] = simplifyRatio(task.rA, task.rB);
+  const sum = aa + bb;
+
+  const parts = [];
+  for(let i=0;i<sum;i++){
+    parts.push({cls: i < aa ? "partA" : "partB"});
+  }
+
+  el.innerHTML = `
+    <div class="vizTitle">Balkenmodell: Verhältnis <b>${aa}:${bb}</b></div>
+    <div class="bar" id="bar">
+      ${parts.map((p,idx)=>`
+        <div class="part ${p.cls}" data-idx="${idx}" style="width:${(100/sum).toFixed(3)}%">
+          <div class="num"></div>
+        </div>
+      `).join("")}
+    </div>
+    <div class="legend">
+      <span class="pill"><span class="dot dotA"></span>${task.nameA}: ${aa} Teile</span>
+      <span class="pill"><span class="dot dotB"></span>${task.nameB}: ${bb} Teile</span><br>
+      Insgesamt: <b>${sum}</b> gleich große Teile
+    </div>
+  `;
+  setAllPartNumbers("");
+  clearPartMarks();
+}
+
+/* ========= Render: Schritte ========= */
+function compute(task){
+  const [aa, bb] = simplifyRatio(task.rA, task.rB);
+  const knownParts = (task.knownSide === "A") ? aa : bb;
+  const askParts   = (task.askSide   === "A") ? aa : bb;
+  const onePart = task.knownValue / knownParts;
+  const result = onePart * askParts;
+
+  return {aa, bb, sum: aa+bb, knownParts, askParts, onePart, result};
+}
+
+function renderSteps(el, task){
+  const c = compute(task);
+  const step3Class = (task.askSide === "A") ? "step3A" : "step3B";
+  const eq3Class   = (task.askSide === "A") ? "eqA" : "eqB";
+
+  // Verhältnisgleichung (didaktisch passend): known/knownParts = x/askParts
+  const knownName = (task.knownSide === "A") ? task.nameA : task.nameB;
+  const askName   = (task.askSide   === "A") ? task.nameA : task.nameB;
+
+  el.innerHTML = `
+    <div class="stepsTitle">Rechnung (erscheint nach dem Prüfen)</div>
+    <div class="stepsGrid">
+      <div class="stepBox stepHidden" id="step1Box">
+        <div class="stepNr">Schritt 1</div>
+        <div class="stepText">Teile ablesen (Verhältnis)</div>
+        <div class="eq"><span class="hl">${c.aa}</span> + <span class="hl">${c.bb}</span> = <span class="hl">${c.sum}</span></div>
+      </div>
+
+      <div class="stepBox stepHidden" id="step2Box">
+        <div class="stepNr">Schritt 2</div>
+        <div class="stepText">Wert pro Teil</div>
+        <div class="eq"><span class="hl">${fmt(task.knownValue)}</span> : <span class="hl">${c.knownParts}</span> = <span class="hl">${fmt(c.onePart)}</span>${task.unit}</div>
+        <div class="hint">(${knownName} hat ${c.knownParts} Teile.)</div>
+      </div>
+
+      <div class="stepBox stepHidden ${step3Class}" id="step3Box">
+        <div class="stepNr">Schritt 3</div>
+        <div class="stepText">${askName} berechnen</div>
+        <div class="eq ${eq3Class}"><span class="hl">${fmt(c.onePart)}</span> · <span class="hl">${c.askParts}</span> = <span class="hl">${fmt(c.result)}</span>${task.unit}</div>
+        <div class="hint">(${askName} hat ${c.askParts} Teile.)</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="miniTitle">Verhältnisgleichung (so wie in der Angabe verlangt)</div>
+    <div class="eq" style="font-size:16px;">
+      <span class="hl">${knownName}</span> / <span class="hl">${c.knownParts}</span> =
+      <span class="hl">x</span> / <span class="hl">${c.askParts}</span>
+    </div>
+    <div class="hint">Hier steht „x“ für ${askName}.</div>
+  `;
+}
+
+function showStepBox(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.classList.remove("stepHidden");
+  el.classList.add("stepShown");
+}
+
+function animateAfterCheck(task){
+  stopAnimation();
+  const c = compute(task);
+  const one = fmt(c.onePart);
+
+  const step1Delay = 400;
+  const step2Delay = 2200;
+  const fillDelay  = 4200;
+
+  timers.push(setTimeout(()=>showStepBox("step1Box"), step1Delay));
+  timers.push(setTimeout(()=>showStepBox("step2Box"), step2Delay));
+  timers.push(setTimeout(()=>fillPartsThenShowStep3(task), fillDelay));
+}
+
+function fillPartsThenShowStep3(task){
+  stopAnimation();
+  const c = compute(task);
+
+  setAllPartNumbers("");
+  clearPartMarks();
+
+  const sum = c.sum;
+  const one = fmt(c.onePart);
+
+  const startDelay = 450;
+  const perPartDelay = 600;
+  const highlightHold = 380;
+  const holdAfterFill = 700;
+
+  for(let i=0;i<sum;i++){
+    timers.push(setTimeout(()=>{
+      clearPartMarks();
+      highlightPart(i);
+      setPartNumber(i, one);
+    }, startDelay + i*perPartDelay));
+
+    timers.push(setTimeout(()=>{
+      unhighlightPart(i);
+    }, startDelay + i*perPartDelay + highlightHold));
+  }
+
+  const afterFill = startDelay + sum*perPartDelay + holdAfterFill;
+
+  timers.push(setTimeout(()=>{
+    showStepBox("step3Box");
+    clearPartMarks();
+
+    const [aa, bb] = [c.aa, c.bb];
+    const idx = [];
+    if(task.askSide === "A"){
+      for(let i=0;i<aa;i++) idx.push(i);
+    }else{
+      for(let i=aa;i<aa+bb;i++) idx.push(i);
+    }
+    highlightGroup(idx);
+  }, afterFill));
+}
+
+/* ========= Task pool ========= */
+function makeTask({cat,title,context,nameA,nameB,rA,rB,knownSide,knownValue,askSide,unit}){
+  return {
+    cat, title, context,
+    nameA, nameB,
+    rA, rB,
+    knownSide, knownValue,
+    askSide,
+    unit: unit || ""
+  };
+}
+
+const baseTasks = [
+  // a) Weiß/Gelb 5:2, gelb 2 L => weiß 5 L
+  makeTask({
+    cat:"Farbe mischen",
+    title:"Aufgabe a)",
+    context:"Markus malt sein Zimmer aus. Er mischt weiße und gelbe Farbe im Verhältnis 5 : 2.",
+    nameA:"Weiße Farbe", nameB:"Gelbe Farbe",
+    rA:5, rB:2,
+    knownSide:"B", knownValue:2,
+    askSide:"A",
+    unit:" L"
+  }),
+  // b) Hellblau/Weiß 3:1, weiß 0,5 L => hellblau 1,5 L
+  makeTask({
+    cat:"Farbe mischen",
+    title:"Aufgabe b)",
+    context:"Sandra malt ihr Zimmer aus. Sie mischt hellblaue und weiße Farbe im Verhältnis 3 : 1.",
+    nameA:"Hellblaue Farbe", nameB:"Weiße Farbe",
+    rA:3, rB:1,
+    knownSide:"B", knownValue:0.5,
+    askSide:"A",
+    unit:" L"
+  }),
+  // c) Hanni/Nanni 3:2, Hanni 3000 => Nanni 2000
+  makeTask({
+    cat:"Erbschaft",
+    title:"Aufgabe c)",
+    context:"Eine Erbschaft wird zwischen Hanni und Nanni im Verhältnis 3 : 2 aufgeteilt. Hanni bekommt 3000 €.",
+    nameA:"Hanni", nameB:"Nanni",
+    rA:3, rB:2,
+    knownSide:"A", knownValue:3000,
+    askSide:"B",
+    unit:" €"
+  }),
+  // d) Max/Moritz 9:8, Moritz 720 => Max 810
+  makeTask({
+    cat:"Erbschaft",
+    title:"Aufgabe d)",
+    context:"Eine Erbschaft wird zwischen Max und Moritz im Verhältnis 9 : 8 aufgeteilt. Moritz erhält 720 €.",
+    nameA:"Max", nameB:"Moritz",
+    rA:9, rB:8,
+    knownSide:"B", knownValue:720,
+    askSide:"A",
+    unit:" €"
+  })
+];
+
+let tasks = baseTasks.slice();
+
+/* ========= UI State ========= */
+let idx = 0;
+let graded = 0;
+let correct = 0;
+let answered = false;
+
+const scoreEl = document.getElementById("score");
+const metaEl = document.getElementById("meta");
+const catEl = document.getElementById("cat");
+const titleEl = document.getElementById("title");
+const textEl = document.getElementById("text");
+const promptEl = document.getElementById("prompt");
+const hintEl = document.getElementById("hint");
+const unitTag = document.getElementById("unitTag");
+const ansEl = document.getElementById("ans");
+const feedbackEl = document.getElementById("feedback");
+const vizEl = document.getElementById("viz");
+const stepsEl = document.getElementById("steps");
+const checkBtn = document.getElementById("checkBtn");
+const nextBtn = document.getElementById("nextBtn");
+const restartBtn = document.getElementById("restartBtn");
+const animToggle = document.getElementById("animToggle");
+
+function updateTop(){
+  scoreEl.textContent = `Richtig: ${correct} / ${graded}`;
+  metaEl.textContent = `${idx + 1} / ${tasks.length}`;
+}
+function resetForTask(){
+  stopAnimation();
+  answered = false;
+  nextBtn.disabled = true;
+  feedbackEl.textContent = "";
+  ansEl.value = "";
+  ansEl.focus();
+}
+
+function render(){
+  updateTop();
+  resetForTask();
+
+  const t = tasks[idx];
+  catEl.textContent = t.cat;
+  titleEl.textContent = t.title;
+  textEl.textContent = t.context;
+
+  const knownName = (t.knownSide === "A") ? t.nameA : t.nameB;
+  const askName   = (t.askSide === "A") ? t.nameA : t.nameB;
+
+  promptEl.textContent = `Wie viel bekommt/braucht ${askName}?`;
+  unitTag.textContent = t.unit;
+
+  hintEl.textContent = `Tipp: 1) Teile ansehen, 2) „pro Teil“ rechnen, 3) mit den Teilen der gesuchten Seite multiplizieren.`;
+
+  renderBarModel(vizEl, t);
+  renderSteps(stepsEl, t);
+}
+
+function lockAndRevealSteps(t){
+  // Schritte erscheinen immer nach dem Prüfen (wie in deinem Beispiel)
+  if(animToggle.checked){
+    animateAfterCheck(t);
+  }else{
+    showStepBox("step1Box");
+    showStepBox("step2Box");
+    showStepBox("step3Box");
+
+    // ohne Animation trotzdem Gruppe markieren + Teilwerte füllen
+    const c = compute(t);
+    const one = fmt(c.onePart);
+    setAllPartNumbers(one);
+    clearPartMarks();
+
+    const [aa, bb] = [c.aa, c.bb];
+    const idxs = [];
+    if(t.askSide === "A"){ for(let i=0;i<aa;i++) idxs.push(i); }
+    else { for(let i=aa;i<aa+bb;i++) idxs.push(i); }
+    highlightGroup(idxs);
+  }
+}
+
+function check(){
+  if(answered) return;
+  const t = tasks[idx];
+  const c = compute(t);
+
+  const userVal = parseDE(ansEl.value);
+  if(!Number.isFinite(userVal)){
+    feedbackEl.textContent = "Bitte eine Zahl eingeben (z.B. 1,5).";
+    return;
+  }
+
+  answered = true;
+  graded++;
+
+  const ok = nearlyEqual(userVal, c.result);
+  if(ok) correct++;
+
+  updateTop();
+  lockAndRevealSteps(t);
+
+  const askName = (t.askSide === "A") ? t.nameA : t.nameB;
+  const right = fmt(c.result) + t.unit;
+
+  feedbackEl.textContent = ok
+    ? `Richtig. ${askName}: ${right}`
+    : `Falsch. Richtig wäre: ${askName}: ${right}`;
+
+  nextBtn.disabled = false;
+}
+
+checkBtn.addEventListener("click", check);
+ansEl.addEventListener("keydown", (e)=>{ if(e.key === "Enter") check(); });
+
+nextBtn.addEventListener("click", ()=>{
+  idx++;
+  if(idx >= tasks.length) idx = 0;
+  render();
+});
+
+restartBtn.addEventListener("click", ()=>{
+  idx = 0; graded = 0; correct = 0;
+  render();
+});
+
+/* ========= Custom task builder ========= */
+const cNameA = document.getElementById("cNameA");
+const cNameB = document.getElementById("cNameB");
+const cA = document.getElementById("cA");
+const cB = document.getElementById("cB");
+const cUnit = document.getElementById("cUnit");
+const cKnownSide = document.getElementById("cKnownSide");
+const cKnownVal = document.getElementById("cKnownVal");
+const cAskSide = document.getElementById("cAskSide");
+const cContext = document.getElementById("cContext");
+const addCustomBtn = document.getElementById("addCustomBtn");
+const resetCustomBtn = document.getElementById("resetCustomBtn");
+
+function resetCustom(){
+  cNameA.value="Weiß";
+  cNameB.value="Gelb";
+  cA.value=5;
+  cB.value=2;
+  cUnit.value=" L";
+  cKnownSide.value="B";
+  cKnownVal.value=2;
+  cAskSide.value="A";
+  cContext.value="Markus mischt Farben im Verhältnis.";
+}
+resetCustomBtn.addEventListener("click", resetCustom);
+
+addCustomBtn.addEventListener("click", ()=>{
+  const rA = Math.max(1, Math.floor(Number(cA.value)));
+  const rB = Math.max(1, Math.floor(Number(cB.value)));
+  const kv = Number(cKnownVal.value);
+
+  if(!Number.isFinite(kv) || kv <= 0){
+    feedbackEl.textContent = "Eigene Aufgabe: Bekannter Wert muss eine positive Zahl sein.";
+    return;
+  }
+  if(cKnownSide.value === cAskSide.value){
+    feedbackEl.textContent = "Eigene Aufgabe: Bekannte Seite und gesuchte Seite müssen verschieden sein.";
+    return;
+  }
+
+  const t = makeTask({
+    cat:"Eigene Aufgabe",
+    title:`Aufgabe (eigene)`,
+    context: `${cContext.value.trim()} Verhältnis ${rA} : ${rB}.`,
+    nameA: cNameA.value.trim() || "A",
+    nameB: cNameB.value.trim() || "B",
+    rA, rB,
+    knownSide: cKnownSide.value,
+    knownValue: kv,
+    askSide: cAskSide.value,
+    unit: cUnit.value
+  });
+
+  // an den Anfang setzen und direkt starten
+  tasks = [t, ...baseTasks];
+  idx = 0;
+  graded = 0;
+  correct = 0;
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
